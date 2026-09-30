@@ -1,0 +1,259 @@
+[
+  {
+    "act_name": "Consumer Protection Act",
+    "year": 2019,
+    "description": "An Act to provide for protection of the interests of consumers.",
+    "domain": "consumer",
+    "provisions": [
+      {
+        "section_number": "Section 2(10)",
+        "title": "Defect",
+        "plain_language_description": "Any fault, imperfection, or shortcoming in the quality, quantity, potency, purity, or standard which is required to be maintained by or under any law for the time being in force or under any contract, express or implied, or as is claimed by the trader in any manner whatsoever in relation to any goods.",
+        "applicability": "Applies when goods purchased have physical flaws, don't work as advertised, or fail to meet standards.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 2(11)",
+        "title": "Deficiency",
+        "plain_language_description": "Any fault, imperfection, shortcoming, or inadequacy in the quality, nature, and manner of performance which is required to be maintained by or under any law for the time being in force or has been undertaken to be performed by a person in pursuance of a contract or otherwise in relation to any service.",
+        "applicability": "Applies when services availed are poor, incomplete, or delayed.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 2(8)",
+        "title": "Consumer Dispute",
+        "plain_language_description": "A dispute where the person against whom a complaint has been made, denies or disputes the allegations contained in the complaint.",
+        "applicability": "Applies when a consumer's complaint is not accepted or resolved by the seller/provider.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 2(47)",
+        "title": "Unfair Trade Practice",
+        "plain_language_description": "A trade practice which, for the purpose of promoting the sale, use or supply of any goods or for the provision of any service, adopts any unfair method or unfair or deceptive practice.",
+        "applicability": "Applies when a seller uses deceptive methods, misleading ads, or fake warranties.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 2(9)",
+        "title": "Consumer Rights",
+        "plain_language_description": "The rights of consumers include the right to be protected against the marketing of goods, products or services which are hazardous to life and property, the right to be informed about the quality, quantity, potency, purity, standard and price of goods, products or services, and the right to seek redressal against unfair or restrictive trade practices.",
+        "applicability": "Applies to all consumers who purchase goods or avail services for consideration.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 35",
+        "title": "Manner in which complaint shall be made",
+        "plain_language_description": "A complaint in relation to any goods sold or delivered or any service provided may be filed with the District Commission by the consumer to whom such goods are sold or delivered or such service is provided.",
+        "applicability": "Applies when a consumer wishes to file a formal complaint with the Consumer Commission.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 2(16)",
+        "title": "E-commerce",
+        "plain_language_description": "Buying or selling of goods or services including digital products over digital or electronic network.",
+        "applicability": "Applies when a consumer purchases goods or services through an online platform or digital network.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 2(6)",
+        "title": "Complaint",
+        "plain_language_description": "Any allegation in writing made by a complainant regarding an unfair trade practice or a restrictive trade practice adopted by any trader, defects in goods, deficiency in services, excess price charged, or goods or services hazardous to life and safety.",
+        "applicability": "Applies when a consumer wishes to formally allege any of the specified grounds before a consumer forum.",
+        "source_url": "https://consumeraffairs.nic.in/en/acts-and-rules/consumer-protection",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      }
+    ]
+  },
+  {
+    "act_name": "Indian Contract Act",
+    "year": 1872,
+    "description": "An Act to define and amend certain parts of the law relating to contracts.",
+    "domain": "contract",
+    "provisions": [
+      {
+        "section_number": "Section 2(h)",
+        "title": "Contract",
+        "plain_language_description": "An agreement enforceable by law is a contract. Every promise and every set of promises forming the consideration for each other is an agreement.",
+        "applicability": "Applies when two or more parties have entered into a legally enforceable agreement involving mutual promises and consideration.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2187",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 73",
+        "title": "Compensation for breach of contract",
+        "plain_language_description": "When a contract has been broken, the party who suffers by such breach is entitled to receive, as compensation for any loss or damage caused to him thereby, such compensation as naturally arose in the usual course of things from such breach.",
+        "applicability": "Applies when one party to a contract has broken the contract and the other party has suffered loss or damage as a result.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2187",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 39",
+        "title": "Effect of refusal to perform promise wholly",
+        "plain_language_description": "When a party to a contract has refused to perform, or disabled himself from performing, his promise in its entirety, the promisee may put an end to the contract.",
+        "applicability": "Applies when one party refuses to perform their contractual obligation entirely, giving the other party the right to terminate.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2187",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 74",
+        "title": "Compensation for breach where penalty is stipulated",
+        "plain_language_description": "When a contract has been broken, if a sum is named in the contract as the amount to be paid in case of such breach, or if the contract contains any other stipulation by way of penalty, the party complaining of the breach is entitled to receive reasonable compensation not exceeding the amount so named.",
+        "applicability": "Applies when the contract specifies a penalty or liquidated damages amount for breach.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2187",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 56",
+        "title": "Agreement to do impossible act",
+        "plain_language_description": "An agreement to do an act impossible in itself is void. A contract to do an act which, after the contract is made, becomes impossible, or by reason of some event which the promisor could not prevent, unlawful, becomes void when the act becomes impossible or unlawful.",
+        "applicability": "Applies when performance of a contract becomes impossible or unlawful after the contract was entered into (frustration of contract).",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2187",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      }
+    ]
+  },
+  {
+    "act_name": "Transfer of Property Act",
+    "year": 1882,
+    "description": "An Act to amend the law relating to the transfer of property by act of parties.",
+    "domain": "rental",
+    "provisions": [
+      {
+        "section_number": "Section 108",
+        "title": "Rights and liabilities of lessor and lessee",
+        "plain_language_description": "In the absence of a contract or local usage to the contrary, the lessor and lessee of immovable property have certain rights and are subject to certain liabilities. The lessor is bound to disclose material defects and put the lessee in possession. The lessee is bound to pay rent, maintain the property, and restore possession on termination.",
+        "applicability": "Applies to all lease/rental agreements for immovable property where no specific contract term overrides these default provisions.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2338",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 111",
+        "title": "Determination of lease",
+        "plain_language_description": "A lease of immovable property determines (terminates) by efflux of time, by happening of a specified event, by the lessee's interest becoming vested in the lessor, by express surrender, by implied surrender, by forfeiture, or on the expiration of a notice to quit.",
+        "applicability": "Applies when determining how and when a lease/rental agreement can be legally terminated.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/2338",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      }
+    ]
+  },
+  {
+    "act_name": "Rent Control (General Principles)",
+    "year": null,
+    "description": "State-specific rent control legislation governs tenancy matters in India. Each state has its own Rent Control Act. This entry represents general principles common across state rent control laws.",
+    "domain": "rental",
+    "provisions": [
+      {
+        "section_number": "General Principle",
+        "title": "Security Deposit",
+        "plain_language_description": "The security deposit paid by a tenant at the commencement of tenancy is refundable upon termination of the tenancy, subject to deductions for unpaid rent, damages beyond normal wear and tear, and other charges as agreed in the rental agreement or permitted under the applicable state rent control law.",
+        "applicability": "Applies when a tenant has paid a security deposit and seeks its return upon vacating the premises. The specific rules vary by state.",
+        "source_url": "https://www.indiacode.nic.in/",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28",
+        "jurisdictional_note": "Rent control laws vary by state. The applicable state/UT rent control act must be identified for specific provisions."
+      },
+      {
+        "section_number": "General Principle",
+        "title": "Landlord and Tenant Obligations",
+        "plain_language_description": "Under general tenancy law, the landlord is obligated to maintain the structural integrity of the premises, ensure habitable conditions, and not interfere with the tenant's peaceful enjoyment. The tenant is obligated to pay rent on time, use the premises for the agreed purpose, and not cause damage beyond normal wear and tear.",
+        "applicability": "Applies to general disputes about landlord or tenant obligations where no specific state provision is being cited.",
+        "source_url": "https://www.indiacode.nic.in/",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28",
+        "jurisdictional_note": "Specific obligations vary by state rent control law and by the terms of the rental agreement."
+      }
+    ]
+  },
+  {
+    "act_name": "Information Technology Act",
+    "year": 2000,
+    "description": "An Act to provide legal recognition for transactions carried out by means of electronic data interchange and other means of electronic communication.",
+    "domain": "cyber",
+    "provisions": [
+      {
+        "section_number": "Section 66",
+        "title": "Computer related offences",
+        "plain_language_description": "If any person, dishonestly or fraudulently, does any act referred to in section 43 (unauthorized access, data theft, introducing viruses, etc.), he shall be punishable with imprisonment for a term which may extend to three years or with fine which may extend to five lakh rupees or with both.",
+        "applicability": "Applies when a person gains unauthorized access to a computer resource, downloads or copies data without permission, or introduces a virus or contaminant.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/1999",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 66C",
+        "title": "Punishment for identity theft",
+        "plain_language_description": "Whoever, fraudulently or dishonestly makes use of the electronic signature, password or any other unique identification feature of any other person, shall be punished with imprisonment of either description for a term which may extend to three years and shall also be liable to fine which may extend to rupees one lakh.",
+        "applicability": "Applies when someone fraudulently uses another person's electronic identity credentials such as passwords, digital signatures, or other unique identification features.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/1999",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 66D",
+        "title": "Punishment for cheating by personation by using computer resource",
+        "plain_language_description": "Whoever, by means of any communication device or computer resource cheats by personating, shall be punished with imprisonment of either description for a term which may extend to three years and shall also be liable to fine which may extend to one lakh rupees.",
+        "applicability": "Applies when someone uses a computer or communication device to impersonate another person for cheating or fraud.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/1999",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 67",
+        "title": "Punishment for publishing or transmitting obscene material in electronic form",
+        "plain_language_description": "Whoever publishes or transmits or causes to be published or transmitted in the electronic form, any material which is lascivious or appeals to the prurient interest shall be punished on first conviction with imprisonment of either description for a term which may extend to three years and with fine which may extend to five lakh rupees.",
+        "applicability": "Applies to cases involving online harassment through publication or transmission of obscene material in electronic form.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/1999",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      },
+      {
+        "section_number": "Section 43",
+        "title": "Penalty and compensation for damage to computer, computer system, etc.",
+        "plain_language_description": "If any person without permission of the owner or any other person who is in charge of a computer, computer system or computer network, accesses or secures access, downloads, copies, extracts data, introduces any contaminant or virus, damages, disrupts, denies access, or assists any person to do any of the above, he shall be liable to pay damages by way of compensation to the person so affected.",
+        "applicability": "Applies to unauthorized access, data theft, system disruption, or introduction of malware into another person's computer or network.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/1999",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      }
+    ]
+  },
+  {
+    "act_name": "Indian Penal Code / Bharatiya Nyaya Sanhita",
+    "year": 2023,
+    "description": "Provisions relating to fraud and cheating applicable to cyber offences.",
+    "domain": "cyber",
+    "provisions": [
+      {
+        "section_number": "Section 318 BNS (erstwhile Section 420 IPC)",
+        "title": "Cheating and dishonestly inducing delivery of property",
+        "plain_language_description": "Whoever cheats and thereby dishonestly induces the person deceived to deliver any property to any person, or to make, alter or destroy the whole or any part of a valuable security, or anything which is signed or sealed, and which is capable of being converted into a valuable security, shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine.",
+        "applicability": "Applies to online financial fraud cases where the victim is deceived into transferring money or property.",
+        "source_url": "https://www.indiacode.nic.in/handle/123456789/15436",
+        "verification_status": "verified",
+        "last_verified_date": "2026-09-28"
+      }
+    ]
+  }
+]

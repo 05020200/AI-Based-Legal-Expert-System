@@ -1,0 +1,122 @@
+[
+  {
+    "concept_key": "consumer",
+    "domain": "consumer",
+    "description": "A person who purchases goods or services for personal use."
+  },
+  {
+    "concept_key": "defect",
+    "domain": "consumer",
+    "description": "A fault, imperfection, or shortcoming in a product's quality or performance."
+  },
+  {
+    "concept_key": "deficiency",
+    "domain": "consumer",
+    "description": "A shortcoming in the quality, nature, or manner of performance of a service."
+  },
+  {
+    "concept_key": "unfair_trade_practice",
+    "domain": "consumer",
+    "description": "Deceptive, misleading, or fraudulent business conduct."
+  },
+  {
+    "concept_key": "product_liability",
+    "domain": "consumer",
+    "description": "Legal responsibility of a seller/manufacturer for defective products."
+  },
+  {
+    "concept_key": "consumer_dispute",
+    "domain": "consumer",
+    "description": "A disagreement where the consumer's complaint is denied or disputed."
+  },
+  {
+    "concept_key": "warranty_related_issue",
+    "domain": "consumer",
+    "description": "A problem arising under the terms of a product or service warranty."
+  },
+  {
+    "concept_key": "refund_related_issue",
+    "domain": "consumer",
+    "description": "A matter concerning the request, denial, or non-receipt of a refund."
+  },
+  {
+    "concept_key": "ecommerce_issue",
+    "domain": "consumer",
+    "description": "A consumer problem that originates from an online purchase."
+  },
+  {
+    "concept_key": "contract",
+    "domain": "contract",
+    "description": "An agreement enforceable by law between two or more parties involving mutual promises and consideration."
+  },
+  {
+    "concept_key": "breach_of_contract",
+    "domain": "contract",
+    "description": "Failure by one party to perform their obligations under a contract without lawful excuse."
+  },
+  {
+    "concept_key": "non_performance",
+    "domain": "contract",
+    "description": "Complete refusal or failure to carry out an agreed contractual obligation."
+  },
+  {
+    "concept_key": "payment_dispute",
+    "domain": "contract",
+    "description": "A dispute arising from non-payment or late payment of a contractual obligation."
+  },
+  {
+    "concept_key": "contractual_term_violation",
+    "domain": "contract",
+    "description": "Violation of a specific term or condition of a contract by one of the parties."
+  },
+  {
+    "concept_key": "tenancy",
+    "domain": "rental",
+    "description": "A legal arrangement where a tenant occupies property owned by a landlord under a rental agreement."
+  },
+  {
+    "concept_key": "security_deposit",
+    "domain": "rental",
+    "description": "A sum of money paid by a tenant to a landlord as a guarantee against damage or non-payment of rent."
+  },
+  {
+    "concept_key": "rent_dispute",
+    "domain": "rental",
+    "description": "A disagreement between landlord and tenant regarding rent payment, amount, or increase."
+  },
+  {
+    "concept_key": "landlord_tenant_obligation",
+    "domain": "rental",
+    "description": "Rights and duties of landlord and tenant under the rental agreement and applicable law."
+  },
+  {
+    "concept_key": "eviction",
+    "domain": "rental",
+    "description": "The legal process of removing a tenant from a rented property."
+  },
+  {
+    "concept_key": "cyber_fraud",
+    "domain": "cyber",
+    "description": "Fraudulent activities conducted through the internet or digital means resulting in financial loss."
+  },
+  {
+    "concept_key": "unauthorized_access",
+    "domain": "cyber",
+    "description": "Gaining access to a computer system or network without permission."
+  },
+  {
+    "concept_key": "identity_theft",
+    "domain": "cyber",
+    "description": "Fraudulent use of another person's identity credentials in electronic form."
+  },
+  {
+    "concept_key": "cyber_harassment",
+    "domain": "cyber",
+    "description": "Harassment, intimidation, or threatening behavior conducted through electronic communication."
+  },
+  {
+    "concept_key": "data_theft",
+    "domain": "cyber",
+    "description": "Unauthorized copying, downloading, or extraction of data from a computer or network."
+  }
+]

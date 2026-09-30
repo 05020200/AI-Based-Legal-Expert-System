@@ -1,0 +1,472 @@
+[
+  {
+    "rule_id": "R1",
+    "domain": "consumer",
+    "rule_name": "Identify Defective Product Issue",
+    "conditions": [
+      {
+        "fact_key": "product_purchased",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "product_defective",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "defective_product_issue",
+    "explanation": "The facts indicate that a product was purchased and the user reports a defect in that product.",
+    "legal_provision_title": "Defect"
+  },
+  {
+    "rule_id": "R2",
+    "domain": "consumer",
+    "rule_name": "Identify Potential Consumer Dispute",
+    "conditions": [
+      {
+        "fact_key": "defective_product_issue",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "seller_contacted",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "seller_denied_or_disputed_claim",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "potential_consumer_dispute",
+    "explanation": "The facts indicate a product-related complaint and that the person against whom the complaint was made has denied or disputed the allegation. This may satisfy the statutory concept of a consumer dispute, subject to the complete facts.",
+    "legal_provision_title": "Consumer Dispute"
+  },
+  {
+    "rule_id": "R3",
+    "domain": "consumer",
+    "rule_name": "Identify Deficient Service Issue",
+    "conditions": [
+      {
+        "fact_key": "service_purchased",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "service_deficient",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "deficient_service_issue",
+    "explanation": "The facts indicate that a service was purchased and the user reports a fault, imperfection, shortcoming or inadequacy in the service.",
+    "legal_provision_title": "Deficiency"
+  },
+  {
+    "rule_id": "R4",
+    "domain": "consumer",
+    "rule_name": "Identify Potential Consumer Dispute For Service",
+    "conditions": [
+      {
+        "fact_key": "deficient_service_issue",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "seller_contacted",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "seller_denied_or_disputed_claim",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "potential_consumer_dispute",
+    "explanation": "The facts indicate a service-related complaint and that the person against whom the complaint was made has denied or disputed the allegation. This may satisfy the statutory concept of a consumer dispute, subject to the complete facts.",
+    "legal_provision_title": "Consumer Dispute"
+  },
+  {
+    "rule_id": "R5",
+    "domain": "consumer",
+    "rule_name": "Identify Potential Unfair Trade Practice",
+    "conditions": [
+      {
+        "fact_key": "representation_related_to_goods_or_service",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "false_or_misleading_representation",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "potential_unfair_trade_practice",
+    "explanation": "The facts indicate a representation concerning goods or services that the user reports as false or misleading. Further factual assessment is required to determine whether the representation falls within the statutory definition of unfair trade practice.",
+    "legal_provision_title": "Unfair Trade Practice"
+  },
+  {
+    "rule_id": "R6",
+    "domain": "consumer",
+    "rule_name": "Identify Complaint Route",
+    "conditions": [
+      {
+        "fact_key": "consumer_issue_identified",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "consumer_complaint_route_available",
+    "explanation": "A consumer issue has been identified. The system can provide information about the statutory consumer complaint route, including the complaint mechanism under Section 35.",
+    "legal_provision_title": "Manner in which complaint shall be made"
+  },
+  {
+    "rule_id": "R7",
+    "domain": "consumer",
+    "rule_name": "Identify Refund or Replacement Issue",
+    "conditions": [
+      {
+        "fact_key": "product_purchased",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "refund_or_replacement_sought",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "refund_or_replacement_denied",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "refund_replacement_issue",
+    "explanation": "The facts indicate that the consumer purchased a product, sought a refund or replacement, and the seller has denied or not provided the refund or replacement.",
+    "legal_provision_title": "Consumer Rights"
+  },
+  {
+    "rule_id": "R8",
+    "domain": "consumer",
+    "rule_name": "Identify Warranty Related Issue",
+    "conditions": [
+      {
+        "fact_key": "product_purchased",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "warranty_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "warranty_claim_denied",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "warranty_related_issue",
+    "explanation": "The facts indicate that the consumer purchased a product with a warranty and the warranty claim has been denied by the seller or manufacturer.",
+    "legal_provision_title": "Consumer Rights"
+  },
+  {
+    "rule_id": "R9",
+    "domain": "consumer",
+    "rule_name": "Identify E-Commerce Consumer Issue",
+    "conditions": [
+      {
+        "fact_key": "online_purchase",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "product_defective",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "ecommerce_consumer_issue",
+    "explanation": "The facts indicate that a product was purchased through an online or e-commerce platform and the product is defective. E-commerce consumer issues may involve additional provisions under the Consumer Protection (E-Commerce) Rules, 2020.",
+    "legal_provision_title": "E-commerce"
+  },
+  {
+    "rule_id": "R10",
+    "domain": "contract",
+    "rule_name": "Identify Breach of Contract",
+    "conditions": [
+      {
+        "fact_key": "contract_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "obligation_not_performed",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "breach_of_contract_issue",
+    "explanation": "The facts indicate that a contract exists between the parties and one party has failed to perform their contractual obligation.",
+    "legal_provision_title": "Compensation for breach of contract"
+  },
+  {
+    "rule_id": "R11",
+    "domain": "contract",
+    "rule_name": "Identify Non-Performance of Contract",
+    "conditions": [
+      {
+        "fact_key": "contract_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "party_refused_performance",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "non_performance_issue",
+    "explanation": "The facts indicate that a contract exists and one party has refused to perform their obligations entirely, potentially entitling the other party to put an end to the contract under Section 39.",
+    "legal_provision_title": "Effect of refusal to perform promise wholly"
+  },
+  {
+    "rule_id": "R12",
+    "domain": "contract",
+    "rule_name": "Identify Payment or Non-Payment Dispute",
+    "conditions": [
+      {
+        "fact_key": "contract_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "payment_due",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "payment_not_received",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "payment_dispute_issue",
+    "explanation": "The facts indicate that a contract exists, a payment is due under the contract, and the payment has not been received. This constitutes a payment dispute.",
+    "legal_provision_title": "Compensation for breach of contract"
+  },
+  {
+    "rule_id": "R13",
+    "domain": "contract",
+    "rule_name": "Identify Contractual Term Violation",
+    "conditions": [
+      {
+        "fact_key": "contract_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "specific_term_violated",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "contractual_term_violation_issue",
+    "explanation": "The facts indicate that a contract exists and a specific term or condition of the contract has been violated by one of the parties.",
+    "legal_provision_title": "Compensation for breach of contract"
+  },
+  {
+    "rule_id": "R14",
+    "domain": "rental",
+    "rule_name": "Identify Security Deposit Dispute",
+    "conditions": [
+      {
+        "fact_key": "rental_agreement_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "security_deposit_paid",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "deposit_not_returned",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "security_deposit_dispute",
+    "explanation": "The facts indicate that a rental agreement existed, a security deposit was paid, and the deposit has not been returned upon termination of the tenancy.",
+    "legal_provision_title": "Security Deposit"
+  },
+  {
+    "rule_id": "R15",
+    "domain": "rental",
+    "rule_name": "Identify Rent Related Dispute",
+    "conditions": [
+      {
+        "fact_key": "rental_agreement_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "rent_dispute",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "rent_related_dispute",
+    "explanation": "The facts indicate that a rental agreement exists and there is a dispute regarding the payment, amount, or increase of rent.",
+    "legal_provision_title": "Rights and liabilities of lessor and lessee"
+  },
+  {
+    "rule_id": "R16",
+    "domain": "rental",
+    "rule_name": "Identify Landlord or Tenant Obligation Dispute",
+    "conditions": [
+      {
+        "fact_key": "rental_agreement_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "obligation_breach_by_party",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "landlord_tenant_obligation_dispute",
+    "explanation": "The facts indicate that a rental agreement exists and one of the parties (landlord or tenant) has breached their obligations under the agreement or applicable law.",
+    "legal_provision_title": "Landlord and Tenant Obligations"
+  },
+  {
+    "rule_id": "R17",
+    "domain": "rental",
+    "rule_name": "Identify Eviction or Lease Termination Issue",
+    "conditions": [
+      {
+        "fact_key": "rental_agreement_exists",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "eviction_or_termination_issue",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "eviction_termination_issue",
+    "explanation": "The facts indicate that a rental agreement exists and there is a dispute about eviction or termination of the lease.",
+    "legal_provision_title": "Determination of lease"
+  },
+  {
+    "rule_id": "R18",
+    "domain": "cyber",
+    "rule_name": "Identify Online Financial Fraud",
+    "conditions": [
+      {
+        "fact_key": "online_transaction",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "financial_loss",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "fraud_or_deception",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "online_financial_fraud_issue",
+    "explanation": "The facts indicate that an online transaction occurred, the user suffered a financial loss, and fraud or deception was involved.",
+    "legal_provision_title": "Cheating and dishonestly inducing delivery of property"
+  },
+  {
+    "rule_id": "R19",
+    "domain": "cyber",
+    "rule_name": "Identify Account Compromise or Unauthorized Access",
+    "conditions": [
+      {
+        "fact_key": "account_compromised",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "unauthorized_access",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "unauthorized_access_issue",
+    "explanation": "The facts indicate that the user's account was compromised and unauthorized access occurred to a computer resource or online account.",
+    "legal_provision_title": "Computer related offences"
+  },
+  {
+    "rule_id": "R20",
+    "domain": "cyber",
+    "rule_name": "Identify Online Identity Theft",
+    "conditions": [
+      {
+        "fact_key": "identity_misused",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "online_impersonation",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "identity_theft_issue",
+    "explanation": "The facts indicate that the user's identity has been misused and someone is impersonating them online.",
+    "legal_provision_title": "Punishment for identity theft"
+  },
+  {
+    "rule_id": "R21",
+    "domain": "cyber",
+    "rule_name": "Identify Cyber Harassment",
+    "conditions": [
+      {
+        "fact_key": "harassment_online",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "electronic_communication_used",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "cyber_harassment_issue",
+    "explanation": "The facts indicate that the user has experienced harassment conducted through electronic communication channels.",
+    "legal_provision_title": "Punishment for publishing or transmitting obscene material in electronic form"
+  },
+  {
+    "rule_id": "R22",
+    "domain": "cyber",
+    "rule_name": "Identify Data Theft or System Damage",
+    "conditions": [
+      {
+        "fact_key": "unauthorized_access",
+        "operator": "==",
+        "expected_value": "true"
+      },
+      {
+        "fact_key": "data_stolen_or_damaged",
+        "operator": "==",
+        "expected_value": "true"
+      }
+    ],
+    "conclusion": "data_theft_issue",
+    "explanation": "The facts indicate unauthorized access to a computer system and data was stolen, copied, or the system was damaged.",
+    "legal_provision_title": "Penalty and compensation for damage to computer, computer system, etc."
+  }
+]
