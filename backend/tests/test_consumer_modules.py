@@ -162,11 +162,21 @@ def test_warranty_rules_preserve_coverage_uncertainty(service):
         "communication_available": True,
         "desired_resolution": "Repair",
     }
-    result = service.analyze("warranty", answers, {"product_name": "Phone"})
+    result = service.analyze("warranty", answers, {
+        "product_name": "Phone",
+        "seller_address": "1 Repair Lane",
+        "purchase_date": "2026-01-12",
+        "amount_paid": "50000",
+        "problem_description": "Laptop will not power on",
+    })
     report = result["report"]
     assert result["rules_fired"] == ["W1", "W2", "W3", "W4", "W5"]
     assert result["backward_result"]["goal_satisfied"] is True
     assert report["case_summary"]["warranty_exists"] is True
+    assert report["case_summary"]["seller_address"] == "1 Repair Lane"
+    assert report["case_summary"]["purchase_date"] == "2026-01-12"
+    assert report["case_summary"]["amount_paid"] == "50000"
+    assert report["case_summary"]["problem_description"] == "Laptop will not power on"
     assert report["case_summary"]["warranty_service_refused"] is True
     assert "Claim declined" in report["case_summary"]["situation_text"]
     assert "unresolved warranty-service request" in report["possible_issue"]
@@ -210,12 +220,22 @@ def test_ecommerce_derivations_rules_guidance_and_evidence(service):
         "communication_available": True,
         "desired_resolution": "Refund",
     }
-    result = service.analyze("ecommerce", answers, {})
+    result = service.analyze("ecommerce", answers, {
+        "product_name": "Wireless mouse",
+        "seller_name": "Gadget House",
+        "seller_address": "8 Market Road",
+        "purchase_date": "2026-09-22",
+        "amount_paid": "2500",
+        "order_or_invoice_number": "OR-19",
+    })
     report = result["report"]
     assert result["facts"]["product_not_received"] is True
     assert result["rules_fired"] == ["EC1", "EC2", "EC4", "EC6", "EC7"]
     assert result["backward_result"]["goal_satisfied"] is True
     assert report["case_summary"]["platform_name"] == "Example Market"
+    assert report["case_summary"]["product_name"] == "Wireless mouse"
+    assert report["case_summary"]["seller_name"] == "Gadget House"
+    assert report["case_summary"]["order_or_invoice_number"] == "OR-19"
     assert report["case_summary"]["ecommerce_problem_type"] == "product_not_delivered"
     assert "non-delivery" in report["case_summary"]["situation_text"]
     assert "unresolved online-order issue" in report["possible_issue"]
@@ -296,11 +316,16 @@ def test_service_deficiency_report_evidence_and_resolution(service):
         "service_evidence_available": True,
         "communication_available": True,
     }
-    result = service.analyze("service_deficiency", answers, {})
+    result = service.analyze("service_deficiency", answers, {
+        "seller_address": "12 Main Street",
+        "order_or_invoice_number": "SV-100",
+    })
     report = result["report"]
     assert result["rules_fired"] == ["SV1", "SV2", "SV3", "SV4"]
     assert result["backward_result"]["goal_satisfied"] is True
     assert "Cleaner did not arrive" in report["case_summary"]["situation_text"]
+    assert report["case_summary"]["seller_address"] == "12 Main Street"
+    assert report["case_summary"]["order_or_invoice_number"] == "SV-100"
     assert "unresolved consumer issue" in report["possible_issue"]
     assert "Section 2(11)" in {item["section_number"] for item in report["legal_provisions"]}
     assert "Section 35" in {item["section_number"] for item in report["legal_provisions"]}
@@ -355,11 +380,20 @@ def test_unfair_trade_practice_report_requires_supported_claim_facts(service):
         "purchase_proof_available": True,
         "communication_available": True,
     }
-    result = service.analyze("unfair_trade_practice", answers, {})
+    result = service.analyze("unfair_trade_practice", answers, {
+        "seller_address": "4 Claim Road",
+        "purchase_date": "2026-09-22",
+        "amount_paid": "2500",
+        "order_or_invoice_number": "AD-50",
+    })
     report = result["report"]
     assert result["rules_fired"] == ["UT1", "UT3", "UT4", "UT5"]
     assert result["backward_result"]["goal_satisfied"] is True
     assert "Same-day service guaranteed" in report["case_summary"]["situation_text"]
+    assert report["case_summary"]["seller_address"] == "4 Claim Road"
+    assert report["case_summary"]["purchase_date"] == "2026-09-22"
+    assert report["case_summary"]["amount_paid"] == "2500"
+    assert report["case_summary"]["order_or_invoice_number"] == "AD-50"
     assert "may raise a consumer issue" in report["possible_issue"]
     assert "Section 2(47)" in {item["section_number"] for item in report["legal_provisions"]}
     assert "Section 35" in {item["section_number"] for item in report["legal_provisions"]}
