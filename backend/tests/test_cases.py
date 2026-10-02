@@ -137,14 +137,119 @@ def test_guest_can_delete_only_their_case_and_cascade_case_data(client):
         cleanup_cases(tokens)
 
 
-def test_only_defective_product_module_is_available(client):
+def test_first_four_consumer_modules_are_available(client):
     response = client.get("/api/modules")
     modules = response.get_json()["modules"]
     assert response.status_code == 200
     assert len(modules) == 6
     assert [module["id"] for module in modules if module["available"]] == [
-        "defective_product"
+        "defective_product",
+        "refund_replacement",
+        "warranty",
+        "ecommerce",
     ]
+
+
+def test_new_module_case_answers_save_reopen_and_remain_isolated(client):
+    created = client.post("/api/cases")
+    created_case = created.get_json()["case"]
+    token = created_case["session_token"]
+    try:
+        assert created_case["created_at"]
+        assert created_case["updated_at"]
+        saved = client.put(f"/api/cases/{token}", json={
+            "module_id": "refund_replacement",
+            "answers": {"product_or_service_purchased": True},
+            "case_details": {"product_name": "Mobile Phone"},
+            "current_question_key": "refund_or_replacement_requested",
+        })
+        assert saved.status_code == 200
+        assert saved.get_json()["case"]["case_title"] == "Mobile Phone — Refund / Replacement Issue"
+
+        reopened = client.get(f"/api/cases/{token}").get_json()["case"]
+        assert reopened["module_id"] == "refund_replacement"
+        assert reopened["answers"] == {"product_or_service_purchased": True}
+        assert reopened["case_details"]["product_name"] == "Mobile Phone"
+        assert reopened["status"] == "In Progress"
+        assert reopened["updated_at"] != created_case["updated_at"]
+
+        unsupported = client.put(f"/api/cases/{token}", json={
+            "answers": {"product_purchased": True},
+        })
+        assert unsupported.status_code == 400
+    finally:
+        cleanup_cases([token])
+
+
+@pytest.mark.parametrize(("module_id", "document_type", "answers", "case_details"), [
+    (
+        "refund_replacement",
+        "refund_request",
+        {"product_or_service_purchased": True, "refund_or_replacement_requested": True},
+        {"product_name": "Phone", "problem_description": "Wrong product received"},
+    ),
+    (
+        "warranty",
+        "warranty_complaint",
+        {"product_purchased": True, "warranty_exists": True, "product_problem_exists": True},
+        {"product_name": "Laptop", "seller_name": "Example Seller"},
+    ),
+    (
+        "ecommerce",
+        "consumer_commission_complaint",
+        {"online_purchase": True, "platform_name": "Example Market", "order_placed": True},
+        {"platform_name": "Example Market", "order_or_invoice_number": "ORD-52"},
+    ),
+])
+def test_new_module_document_preview_and_pdf(client, module_id, document_type, answers, case_details):
+    pytest.importorskip("reportlab")
+    created = client.post("/api/cases")
+    token = created.get_json()["case"]["session_token"]
+    try:
+        saved = client.put(f"/api/cases/{token}", json={
+            "module_id": module_id,
+            "answers": answers,
+            "case_details": case_details,
+            "report": {
+                "title": "Module Guidance",
+                "assessment": "Based on the information provided, this may indicate an issue.",
+                "case_summary": {},
+                "legal_provisions": [{
+                    "act_name": "Consumer Protection Act, 2019",
+                    "section_number": "Section 2(9)",
+                    "title": "Consumer Rights",
+                }],
+                "evidence_checklist": [],
+            },
+        })
+        assert saved.status_code == 200
+
+        preview = client.post(f"/api/cases/{token}/documents", json={
+            "document_type": document_type,
+            "consumer_details": {"consumer_name": "Priya S"},
+        })
+        assert preview.status_code == 200
+        assert preview.get_json()["title"]
+        assert "Priya S" in preview.get_json()["preview"]
+        if module_id == "ecommerce":
+            assert "ORD-52" in preview.get_json()["preview"]
+
+        pdf = client.post(f"/api/cases/{token}/documents/pdf", json={
+            "document_type": document_type,
+            "consumer_details": {"consumer_name": "Priya S"},
+        })
+        assert pdf.status_code == 200
+        assert pdf.mimetype == "application/pdf"
+        assert pdf.data.startswith(b"%PDF")
+        text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf.data)).pages)
+        assert "Priya S" in text
+        ready = client.get(f"/api/cases/{token}").get_json()["case"]
+        assert ready["status"] == "Document Ready"
+        completed = client.put(f"/api/cases/{token}", json={"status": "Completed"})
+        assert completed.status_code == 200
+        assert completed.get_json()["case"]["status"] == "Completed"
+    finally:
+        cleanup_cases([token])
 
 
 def test_document_generation_requires_explicit_supported_action(monkeypatch, client):

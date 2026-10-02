@@ -1,0 +1,174 @@
+{
+  "refund_replacement": {
+    "name": "Refund / Replacement Issue",
+    "description": "A seller has not provided a requested refund or replacement.",
+    "title_detail_key": "product_name",
+    "issue_conclusion": "refund_replacement_issue",
+    "unresolved_conclusion": "unresolved_refund_replacement_issue",
+    "resolved_fact": "refund_or_replacement_provided",
+    "why_relevant": "You reported a purchase and requested a refund or replacement. Whether the seller agreed and whether the remedy was actually provided are relevant to the reported issue.",
+    "questions": [
+      {"key":"product_or_service_purchased","prompt":"Did you purchase a product or service from a seller or business?","type":"boolean","required":true},
+      {"key":"refund_or_replacement_requested","prompt":"Did you request a refund or replacement?","type":"boolean","required":true,"visible_when":[{"fact_key":"product_or_service_purchased","equals":"true"}]},
+      {"key":"reason_for_request","prompt":"Why did you request a refund or replacement?","type":"choice","required":true,"visible_when":[{"fact_key":"refund_or_replacement_requested","equals":"true"}],"options":["Product defective","Product damaged","Wrong product received","Product not as described","Product incomplete","Product/service issue","Other"]},
+      {"key":"product_has_problem","prompt":"Does the product or service still have a problem?","type":"boolean","required":true,"visible_when":[{"fact_key":"refund_or_replacement_requested","equals":"true"}]},
+      {"key":"seller_contacted","prompt":"Did you contact the seller or business about the request?","type":"boolean","required":true,"visible_when":[{"fact_key":"refund_or_replacement_requested","equals":"true"}]},
+      {"key":"seller_agreed","prompt":"Did the seller agree to the refund or replacement?","type":"boolean","required":true,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"refund_or_replacement_provided","prompt":"Was the agreed refund or replacement actually provided?","type":"boolean","required":true,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"seller_response","prompt":"What response did the seller give?","type":"text","required":false,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"purchase_proof_available","prompt":"Is proof of purchase available?","type":"boolean","required":true,"visible_when":[{"fact_key":"product_or_service_purchased","equals":"true"}]},
+      {"key":"problem_evidence_available","prompt":"Is evidence of the problem available?","type":"boolean","required":true,"visible_when":[{"fact_key":"refund_or_replacement_requested","equals":"true"}]},
+      {"key":"seller_communication_available","prompt":"Is communication with the seller available?","type":"boolean","required":true,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"desired_resolution","prompt":"What resolution do you want?","type":"choice","required":true,"visible_when":[{"fact_key":"refund_or_replacement_requested","equals":"true"}],"options":["Refund","Replacement","Repair","Not sure"]}
+    ],
+    "rules": [
+      {"rule_id":"RR1","rule_name":"Identify a refund or replacement issue","conditions":[{"fact_key":"product_or_service_purchased","expected_value":"true"},{"fact_key":"refund_or_replacement_requested","expected_value":"true"}],"conclusion":"refund_replacement_issue","explanation":"A purchase and a refund or replacement request were reported."},
+      {"rule_id":"RR2","rule_name":"Identify an unresolved refund or replacement issue","conditions":[{"fact_key":"refund_replacement_issue","expected_value":"true"},{"fact_key":"seller_contacted","expected_value":"true"},{"fact_key":"refund_or_replacement_provided","expected_value":"false"}],"conclusion":"unresolved_refund_replacement_issue","explanation":"The seller was contacted and the requested refund or replacement was not reported as provided."},
+      {"rule_id":"RR3","rule_name":"Identify a disputed refund or replacement request","conditions":[{"fact_key":"refund_replacement_issue","expected_value":"true"},{"fact_key":"seller_contacted","expected_value":"true"},{"fact_key":"seller_agreed","expected_value":"false"}],"conclusion":"potential_consumer_dispute","explanation":"The seller was contacted and did not agree to the requested refund or replacement."},
+      {"rule_id":"RR4","rule_name":"Identify consumer guidance need","conditions":[{"fact_key":"unresolved_refund_replacement_issue","expected_value":"true"}],"conclusion":"consumer_guidance_required","explanation":"The requested refund or replacement remains unresolved after contacting the seller."},
+      {"rule_id":"RR5","rule_name":"Identify complaint route for an unresolved request","conditions":[{"fact_key":"unresolved_refund_replacement_issue","expected_value":"true"}],"conclusion":"consumer_complaint_route_available","explanation":"The facts indicate an unresolved consumer request; complaint-route information may be relevant."}
+    ],
+    "evidence": [
+      {"fact_key":"purchase_proof_available","name":"Purchase Invoice / Receipt"},
+      {"fact_key":"problem_evidence_available","name":"Product Photos / Videos"},
+      {"fact_key":"seller_communication_available","name":"Seller Communication"}
+    ],
+    "recommended_evidence": ["Purchase Invoice / Receipt","Order Confirmation / Order Details","Payment Proof","Seller Communication","Product Photos / Videos","Warranty Card / Warranty Document, if applicable","Previous Refund Request","Previous Replacement Request","Complaint / Reference Number"],
+    "documents": [
+      {"type":"seller_complaint","label":"Prepare Seller Complaint"},
+      {"type":"refund_request","label":"Prepare Refund Request"},
+      {"type":"replacement_request","label":"Prepare Replacement Request"},
+      {"type":"consumer_commission_complaint","label":"Prepare Consumer Commission Complaint"}
+    ],
+    "resolved_options": ["You reported that the requested refund or replacement was provided."],
+    "unresolved_options": ["Depending on the circumstances and applicable terms, you may ask the seller to provide the requested remedy or explain its response.","If the request remains unresolved, you may consider grievance support or a formal consumer complaint under the applicable procedure."],
+    "general_options": ["You may check the status of your request with the seller and review the applicable purchase and return terms."],
+    "resolved_next_steps": ["Keep your purchase proof, communication with the seller, and records showing how the request was resolved."],
+    "unresolved_next_steps": ["Keep the purchase, request, seller response, and communication records together.","If you have not contacted the seller, consider sending a written request and keeping a copy.","If the matter remains unresolved, consider seeking grievance assistance or reviewing the formal complaint route and current filing instructions."],
+    "general_next_steps": ["Keep your purchase proof and refund or replacement request records.","If the request is still pending, consider asking the seller for a status update and keeping the response."]
+  },
+  "warranty": {
+    "name": "Warranty Issue",
+    "description": "A product problem has arisen and requested warranty service may not have been provided.",
+    "title_detail_key": "product_name",
+    "issue_conclusion": "warranty_related_issue",
+    "unresolved_conclusion": "unresolved_warranty_issue",
+    "resolved_fact": "warranty_service_provided",
+    "why_relevant": "You reported a product problem and that a warranty exists. These answers do not establish that the warranty is valid or that the reported problem is covered; the applicable terms and additional facts matter.",
+    "questions": [
+      {"key":"product_purchased","prompt":"Was the product purchased from a seller or business?","type":"boolean","required":true},
+      {"key":"warranty_exists","prompt":"Does the product have a warranty, according to the information available to you?","type":"boolean","required":true,"visible_when":[{"fact_key":"product_purchased","equals":"true"}]},
+      {"key":"warranty_document_available","prompt":"Is the warranty document available?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_exists","equals":"true"}]},
+      {"key":"product_problem_exists","prompt":"Did a problem occur with the product?","type":"boolean","required":true,"visible_when":[{"fact_key":"product_purchased","equals":"true"}]},
+      {"key":"warranty_service_requested","prompt":"Was warranty service requested?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_exists","equals":"true"},{"fact_key":"product_problem_exists","equals":"true"}]},
+      {"key":"seller_or_service_contacted","prompt":"Was the seller or an authorised service provider contacted?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_service_requested","equals":"true"}]},
+      {"key":"warranty_service_provided","prompt":"Was the requested warranty service provided?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_service_requested","equals":"true"}]},
+      {"key":"warranty_service_refused","prompt":"Was warranty service refused or left incomplete?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_service_requested","equals":"true"},{"fact_key":"warranty_service_provided","equals":"false"}]},
+      {"key":"warranty_refusal_reason","prompt":"What reason was given for refusal or non-completion?","type":"text","required":false,"visible_when":[{"fact_key":"warranty_service_refused","equals":"true"}]},
+      {"key":"purchase_proof_available","prompt":"Is proof of purchase available?","type":"boolean","required":true,"visible_when":[{"fact_key":"product_purchased","equals":"true"}]},
+      {"key":"service_record_available","prompt":"Are service records available?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_service_requested","equals":"true"}]},
+      {"key":"communication_available","prompt":"Is communication with the seller or service provider available?","type":"boolean","required":true,"visible_when":[{"fact_key":"warranty_service_requested","equals":"true"}]},
+      {"key":"desired_resolution","prompt":"What resolution do you want?","type":"choice","required":true,"visible_when":[{"fact_key":"warranty_service_requested","equals":"true"}],"options":["Repair","Replacement","Refund","Warranty service","Not sure"]}
+    ],
+    "rules": [
+      {"rule_id":"W1","rule_name":"Identify a reported warranty-related issue","conditions":[{"fact_key":"product_purchased","expected_value":"true"},{"fact_key":"warranty_exists","expected_value":"true"},{"fact_key":"product_problem_exists","expected_value":"true"}],"conclusion":"warranty_related_issue","explanation":"A product purchase, a user-reported warranty, and a product problem were reported. This does not establish warranty validity or coverage."},
+      {"rule_id":"W2","rule_name":"Identify an unresolved warranty service issue","conditions":[{"fact_key":"warranty_related_issue","expected_value":"true"},{"fact_key":"warranty_service_requested","expected_value":"true"},{"fact_key":"warranty_service_provided","expected_value":"false"}],"conclusion":"unresolved_warranty_issue","explanation":"Requested warranty service was not reported as provided."},
+      {"rule_id":"W3","rule_name":"Identify a disputed warranty request","conditions":[{"fact_key":"unresolved_warranty_issue","expected_value":"true"},{"fact_key":"warranty_service_refused","expected_value":"true"}],"conclusion":"potential_consumer_dispute","explanation":"The user reports warranty service was refused or left incomplete."},
+      {"rule_id":"W4","rule_name":"Identify consumer guidance need","conditions":[{"fact_key":"unresolved_warranty_issue","expected_value":"true"}],"conclusion":"consumer_guidance_required","explanation":"Requested warranty service remains unresolved."},
+      {"rule_id":"W5","rule_name":"Identify complaint route for unresolved warranty service","conditions":[{"fact_key":"unresolved_warranty_issue","expected_value":"true"}],"conclusion":"consumer_complaint_route_available","explanation":"Complaint-route information may be relevant to the unresolved warranty service request."}
+    ],
+    "evidence": [
+      {"fact_key":"warranty_document_available","name":"Warranty Card / Warranty Document"},
+      {"fact_key":"purchase_proof_available","name":"Purchase Invoice / Receipt"},
+      {"fact_key":"service_record_available","name":"Repair / Service Records"},
+      {"fact_key":"communication_available","name":"Seller / Service Centre Communication"}
+    ],
+    "recommended_evidence": ["Warranty Card / Warranty Document","Purchase Invoice / Receipt","Product Serial Number / IMEI","Repair / Service Records","Service Request Number","Seller / Service Centre Communication","Product Photos / Videos"],
+    "documents": [
+      {"type":"warranty_complaint","label":"Prepare Warranty Complaint"},
+      {"type":"seller_complaint","label":"Prepare Seller Complaint"},
+      {"type":"replacement_request","label":"Prepare Replacement Request"},
+      {"type":"refund_request","label":"Prepare Refund Request"},
+      {"type":"consumer_commission_complaint","label":"Prepare Consumer Commission Complaint"}
+    ],
+    "resolved_options": ["You reported that warranty service was provided. This does not determine the validity or scope of any warranty."],
+    "unresolved_options": ["Review the warranty terms and service records; the available information does not establish that the reported problem is covered.","If requested warranty service remains unresolved, you may consider contacting the seller or service provider again and reviewing available grievance channels."],
+    "general_options": ["Review the warranty terms and ask the seller or service provider for clarification. This report does not determine warranty validity or coverage."],
+    "resolved_next_steps": ["Keep the purchase proof, warranty document, service records, and communications showing the service provided."],
+    "unresolved_next_steps": ["Keep the purchase proof, warranty terms, service job sheets, and communications together.","Ask the seller or service provider to explain any refusal or incomplete service in writing.","If the matter remains unresolved, consider grievance assistance or reviewing the formal complaint route and current filing instructions."],
+    "general_next_steps": ["Keep the purchase proof and any warranty terms you have.","If you need warranty service, ask the seller or service provider about the applicable process and keep a record of the response."]
+  },
+  "ecommerce": {
+    "name": "E-Commerce Consumer Issue",
+    "description": "A problem occurred with an order placed through an online platform, website, or app.",
+    "title_detail_key": "platform_name",
+    "issue_conclusion": "ecommerce_consumer_issue",
+    "unresolved_conclusion": "unresolved_ecommerce_issue",
+    "resolved_fact": "issue_resolved",
+    "why_relevant": "You reported an online order and an issue with its purchase, payment, delivery, product, refund, replacement, or cancellation. The facts supplied do not determine liability or the outcome of any request.",
+    "questions": [
+      {"key":"online_purchase","prompt":"Was the purchase made online?","type":"boolean","required":true},
+      {"key":"platform_name","prompt":"Which platform, website, or app was used?","type":"text","required":false,"visible_when":[{"fact_key":"online_purchase","equals":"true"}]},
+      {"key":"order_placed","prompt":"Was an order placed?","type":"boolean","required":true,"visible_when":[{"fact_key":"online_purchase","equals":"true"}]},
+      {"key":"payment_made","prompt":"Was payment made?","type":"boolean","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}]},
+      {"key":"delivery_received","prompt":"Was the order delivered?","type":"boolean","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}]},
+      {"key":"ecommerce_problem_type","prompt":"What problem occurred?","type":"choice","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}],"options":[{"label":"Product not delivered","value":"product_not_delivered"},{"label":"Wrong product","value":"wrong_product"},{"label":"Damaged product","value":"damaged_product"},{"label":"Defective product","value":"defective_product"},{"label":"Incomplete order","value":"incomplete_order"},{"label":"Product not as described","value":"product_not_as_described"},{"label":"Refund not received","value":"refund_not_received"},{"label":"Replacement not provided","value":"replacement_not_provided"},{"label":"Cancellation issue","value":"cancellation_issue"},{"label":"Other","value":"other"}]},
+      {"key":"seller_contacted","prompt":"Did you contact the seller or platform?","type":"boolean","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}]},
+      {"key":"seller_response","prompt":"What response did you receive?","type":"text","required":false,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"issue_resolved","prompt":"Was the issue resolved?","type":"boolean","required":true,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"order_proof_available","prompt":"Is the order confirmation available?","type":"boolean","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}]},
+      {"key":"payment_proof_available","prompt":"Is payment proof available?","type":"boolean","required":true,"visible_when":[{"fact_key":"payment_made","equals":"true"}]},
+      {"key":"delivery_proof_available","prompt":"Are delivery or tracking records available?","type":"boolean","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}]},
+      {"key":"communication_available","prompt":"Are seller or platform communications available?","type":"boolean","required":true,"visible_when":[{"fact_key":"seller_contacted","equals":"true"}]},
+      {"key":"desired_resolution","prompt":"What resolution do you want?","type":"choice","required":true,"visible_when":[{"fact_key":"order_placed","equals":"true"}],"options":["Refund","Replacement","Repair","Not sure"]}
+    ],
+    "choice_derivations": {
+      "ecommerce_problem_type": {
+        "product_not_delivered":{"product_not_received":true},
+        "wrong_product":{"wrong_product":true},
+        "damaged_product":{"damaged_product":true},
+        "defective_product":{"product_defective":true},
+        "incomplete_order":{"incomplete_order":true},
+        "product_not_as_described":{"product_not_as_described":true},
+        "refund_not_received":{"refund_pending":true},
+        "replacement_not_provided":{"replacement_pending":true},
+        "cancellation_issue":{"cancellation_issue":true}
+      }
+    },
+    "rules": [
+      {"rule_id":"EC1","rule_name":"Identify an e-commerce order issue","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"order_placed","expected_value":"true"}],"conclusion":"ecommerce_consumer_issue","explanation":"The user reports an online purchase and an order with a problem type they selected."},
+      {"rule_id":"EC2","rule_name":"Identify possible non-delivery","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"order_placed","expected_value":"true"},{"fact_key":"payment_made","expected_value":"true"},{"fact_key":"delivery_received","expected_value":"false"}],"conclusion":"possible_non_delivery_issue","explanation":"The user reports an online order, payment, and no delivery."},
+      {"rule_id":"EC3","rule_name":"Identify possible wrong-product issue","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"wrong_product","expected_value":"true"}],"conclusion":"possible_wrong_product_issue","explanation":"The user selected wrong product as the online order problem."},
+      {"rule_id":"EC4","rule_name":"Identify unresolved e-commerce issue","conditions":[{"fact_key":"ecommerce_consumer_issue","expected_value":"true"},{"fact_key":"seller_contacted","expected_value":"true"},{"fact_key":"issue_resolved","expected_value":"false"}],"conclusion":"unresolved_ecommerce_issue","explanation":"The seller or platform was contacted and the selected online-order issue remains unresolved."},
+      {"rule_id":"EC5","rule_name":"Identify an unresolved refund request","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"refund_pending","expected_value":"true"},{"fact_key":"seller_contacted","expected_value":"true"},{"fact_key":"issue_resolved","expected_value":"false"}],"conclusion":"potential_consumer_dispute","explanation":"The user reports an online refund not received after contacting the seller or platform, with the issue unresolved."},
+      {"rule_id":"EC6","rule_name":"Identify consumer guidance need","conditions":[{"fact_key":"unresolved_ecommerce_issue","expected_value":"true"}],"conclusion":"consumer_guidance_required","explanation":"The e-commerce issue remains unresolved after contact with the seller or platform."},
+      {"rule_id":"EC7","rule_name":"Identify complaint route for an unresolved e-commerce issue","conditions":[{"fact_key":"unresolved_ecommerce_issue","expected_value":"true"}],"conclusion":"consumer_complaint_route_available","explanation":"Complaint-route information may be relevant to the unresolved online-order issue."},
+      {"rule_id":"EC8","rule_name":"Identify a damaged-product online order","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"damaged_product","expected_value":"true"}],"conclusion":"possible_damaged_product_issue","explanation":"The user selected damaged product for an online order."},
+      {"rule_id":"EC9","rule_name":"Identify a defective-product online order","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"product_defective","expected_value":"true"}],"conclusion":"possible_defective_product_issue","explanation":"The user selected defective product for an online order."},
+      {"rule_id":"EC10","rule_name":"Identify an incomplete online order","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"incomplete_order","expected_value":"true"}],"conclusion":"possible_incomplete_order_issue","explanation":"The user selected incomplete order for the online order problem."},
+      {"rule_id":"EC11","rule_name":"Identify a product-not-as-described online order","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"product_not_as_described","expected_value":"true"}],"conclusion":"possible_not_as_described_issue","explanation":"The user selected product not as described for the online order problem."},
+      {"rule_id":"EC12","rule_name":"Identify an online refund-pending issue","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"refund_pending","expected_value":"true"}],"conclusion":"possible_pending_refund_issue","explanation":"The user selected refund not received for the online order problem."},
+      {"rule_id":"EC13","rule_name":"Identify an online replacement-pending issue","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"replacement_pending","expected_value":"true"}],"conclusion":"possible_pending_replacement_issue","explanation":"The user selected replacement not provided for the online order problem."},
+      {"rule_id":"EC14","rule_name":"Identify an online cancellation issue","conditions":[{"fact_key":"online_purchase","expected_value":"true"},{"fact_key":"cancellation_issue","expected_value":"true"}],"conclusion":"possible_cancellation_issue","explanation":"The user selected cancellation issue for the online order problem."}
+    ],
+    "evidence": [
+      {"fact_key":"order_proof_available","name":"Order Confirmation / Order Details"},
+      {"fact_key":"payment_proof_available","name":"Payment Proof"},
+      {"fact_key":"delivery_proof_available","name":"Delivery Proof"},
+      {"fact_key":"communication_available","name":"Seller / Platform Communication"}
+    ],
+    "recommended_evidence": ["Order Confirmation / Order Details","Payment Proof","Invoice","Delivery Proof","Product Photos / Videos","Product Listing / Screenshot","Seller / Platform Communication","Refund/Replacement Request","Cancellation/Return Request","Return/Tracking Details"],
+    "documents": [
+      {"type":"seller_complaint","label":"Prepare Seller Complaint"},
+      {"type":"refund_request","label":"Prepare Refund Request"},
+      {"type":"replacement_request","label":"Prepare Replacement Request"},
+      {"type":"consumer_commission_complaint","label":"Prepare Consumer Commission Complaint"}
+    ],
+    "resolved_options": ["You reported that the issue was resolved. Keep the confirmation and associated records."],
+    "unresolved_options": ["Depending on the order and the platform's terms, you may ask the seller or platform to clarify the delivery, refund, replacement, or cancellation status.","If the issue remains unresolved, you may consider grievance support or a formal consumer complaint under the applicable procedure."],
+    "general_options": ["Review the order status and platform terms; the answers do not currently establish that the selected issue remains unresolved."],
+    "resolved_next_steps": ["Keep the order confirmation, payment and delivery records, seller/platform communication, and resolution confirmation."],
+    "unresolved_next_steps": ["Keep the order confirmation, payment and delivery records, and all seller/platform communications together.","If the issue remains unresolved, consider contacting the platform through its recorded support channel and keeping the reference number.","Review available grievance routes and current formal complaint instructions if the matter is not resolved."],
+    "general_next_steps": ["Keep your order, payment, and delivery records.","If the order issue is still pending, check its status with the seller or platform and keep the response."]
+  }
+}

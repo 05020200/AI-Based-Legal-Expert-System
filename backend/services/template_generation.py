@@ -66,6 +66,7 @@ class TemplateGenerationService:
     }
     _DOCUMENT_TITLES = {
         "seller_complaint": "SELLER COMPLAINT",
+        "warranty_complaint": "WARRANTY COMPLAINT",
         "replacement_request": "REPLACEMENT REQUEST",
         "refund_request": "REFUND REQUEST",
         "consumer_commission_complaint": "CONSUMER COMMISSION COMPLAINT",
@@ -254,6 +255,95 @@ class TemplateGenerationService:
             f"Selected resolution in case: {selected_resolution}\n\n"
             f"{body}\n\nEvidence reported available:\n{evidence_text}"
         )
+
+    def generate_consumer_module_document(
+        self,
+        module_id: str,
+        document_type: str,
+        case_id: str,
+        case_details: Dict[str, Any],
+        answers: Dict[str, Any],
+        report: Dict[str, Any],
+        consumer_details: Dict[str, Any],
+    ) -> str:
+        from services.consumer_modules import ConsumerModuleService
+
+        definition = ConsumerModuleService.get_module(module_id)
+        document_types = {item["type"] for item in definition["documents"]}
+        if document_type not in document_types:
+            raise ValueError("Unsupported document type for this consumer issue.")
+
+        consumer_values = {
+            "Consumer name": consumer_details.get("consumer_name") or "[Consumer Name Not Provided]",
+            "Consumer address": consumer_details.get("consumer_address") or "[Consumer Address Not Provided]",
+            "Consumer phone": consumer_details.get("consumer_phone") or "[Consumer Phone Not Provided]",
+            "Consumer email": consumer_details.get("consumer_email") or "[Consumer Email Not Provided]",
+            "Document date": consumer_details.get("document_date") or "[Document Date Not Provided]",
+        }
+        lines = [
+            self._DOCUMENT_TITLES[document_type],
+            f"Case ID: {case_id}",
+            f"Issue: {definition['name']}",
+            "",
+            "Consumer Details:",
+            *[f"{label}: {value}" for label, value in consumer_values.items()],
+            "",
+            "Case Details:",
+        ]
+        detail_labels = {
+            "product_name": "Product",
+            "platform_name": "Platform",
+            "seller_name": "Seller / Business",
+            "seller_address": "Seller Address",
+            "purchase_date": "Purchase / Order Date",
+            "amount_paid": "Amount Paid",
+            "order_or_invoice_number": "Order / Invoice Number",
+            "problem_description": "Problem Description",
+            "seller_response": "Seller / Platform Response",
+        }
+        for key, label in detail_labels.items():
+            value = case_details.get(key)
+            if value not in (None, ""):
+                lines.append(f"{label}: {value}")
+
+        lines.extend(["", "Facts Reported:"])
+        for question in ConsumerModuleService.get_questions(module_id):
+            key = question["key"]
+            if key not in answers:
+                continue
+            value = answers[key]
+            if isinstance(value, bool):
+                value = "Yes" if value else "No"
+            lines.append(f"{question['prompt']} {value}")
+
+        evidence = [
+            item["name"] for item in report.get("evidence_checklist", [])
+            if item.get("available") is True
+        ]
+        lines.extend(["", "Evidence Reported Available:"])
+        lines.extend(f"- {item}" for item in evidence)
+        if not evidence:
+            lines.append("[No evidence reported as available]")
+
+        lines.extend(["", "Relevant Provisions in the Guidance:"])
+        provisions = report.get("legal_provisions") or []
+        for provision in provisions:
+            lines.append(
+                f"- {provision.get('act_name')} — {provision.get('section_number')}: {provision.get('title')}"
+            )
+        if not provisions:
+            lines.append("[No specific provision was identified in the guidance]")
+
+        lines.extend([
+            "",
+            "Reported Assessment:",
+            report.get("possible_issue") or report.get("assessment") or "[Guidance not provided]",
+            "",
+            f"Requested resolution: {answers.get('desired_resolution') or '[Not Provided]'}",
+            "",
+            "This is a preliminary draft based only on the information supplied. Review all details, applicable terms, and current filing requirements before use. It does not guarantee any outcome.",
+        ])
+        return "\n".join(lines)
 
     def _generate_commission_complaint(
         self, case_details: Dict[str, Any], consumer_details: Dict[str, Any]

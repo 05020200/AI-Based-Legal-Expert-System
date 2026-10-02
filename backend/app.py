@@ -18,6 +18,7 @@ from services.authority_info import AuthorityInfoService
 from services.document_recommendation import DocumentRecommendationService
 from services.fact_extraction import FactExtractor
 from services.defective_product import DefectiveProductService
+from services.consumer_modules import ConsumerModuleService
 import uuid
 
 
@@ -147,6 +148,51 @@ def analyze_defective_product():
         "session_token": session_token,
         "report": result["report"],
     }), 200
+
+
+@app.route("/api/modules/<module_id>/questions", methods=["GET"])
+def consumer_module_questions(module_id):
+    try:
+        return jsonify({"questions": ConsumerModuleService.get_questions(module_id)}), 200
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 404
+
+
+@app.route("/api/modules/<module_id>/question", methods=["POST"])
+def consumer_module_question(module_id):
+    data = request.get_json(silent=True) or {}
+    answers = data.get("answers", {})
+    current_key = data.get("current_key")
+    direction = data.get("direction", "next")
+    if not isinstance(answers, dict) or not isinstance(current_key, (str, type(None))):
+        return jsonify({"error": "Invalid question navigation data."}), 400
+    try:
+        result = ConsumerModuleService.get_next_question(
+            module_id, answers, current_key, direction
+        )
+        return jsonify(result), 200
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@app.route("/api/modules/<module_id>/analyze", methods=["POST"])
+def analyze_consumer_module(module_id):
+    if not request.is_json:
+        return jsonify({"error": "A JSON request body is required."}), 400
+    data = request.get_json() or {}
+    answers = data.get("answers", {})
+    case_details = data.get("case_details", {})
+    if not isinstance(answers, dict) or not isinstance(case_details, dict):
+        return jsonify({"error": "Answers and case details must be objects."}), 400
+    try:
+        result = ConsumerModuleService.analyze(module_id, answers, case_details)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except (OSError, json.JSONDecodeError) as error:
+        app.logger.exception("Unable to prepare consumer module guidance")
+        return jsonify({"error": "Unable to prepare the guidance report."}), 500
+
+    return jsonify({"success": True, **result}), 200
 
 
 # ---------------------------------------------------------

@@ -6,6 +6,7 @@ from io import BytesIO
 from flask import Blueprint, jsonify, request, send_file, session
 
 from database.db import get_db_connection
+from services.consumer_modules import ConsumerModuleService
 from services.template_generation import TemplateGenerationService
 
 
@@ -13,12 +14,13 @@ cases_bp = Blueprint("cases", __name__)
 _CASE_STATE_KEY = "__case_state__"
 _MODULES = [
     {"id": "defective_product", "name": "Defective Product", "description": "Product is damaged, faulty, defective, or does not work properly.", "available": True},
-    {"id": "refund_replacement", "name": "Refund / Replacement", "description": "A seller refuses or delays a refund or replacement.", "available": False},
-    {"id": "warranty", "name": "Warranty Issue", "description": "A warranty claim is denied, delayed, or not honoured.", "available": False},
-    {"id": "ecommerce", "name": "E-Commerce Consumer Issue", "description": "A problem involving an online purchase or delivery.", "available": False},
+    {"id": "refund_replacement", "name": "Refund / Replacement Issue", "description": "A seller has not provided a requested refund or replacement.", "available": True},
+    {"id": "warranty", "name": "Warranty Issue", "description": "A product problem has arisen and requested warranty service may not have been provided.", "available": True},
+    {"id": "ecommerce", "name": "E-Commerce Consumer Issue", "description": "A problem occurred with an order placed through an online platform, website, or app.", "available": True},
     {"id": "service_deficiency", "name": "Deficiency in Service", "description": "A service was not provided properly or as expected.", "available": False},
     {"id": "unfair_trade_practice", "name": "Misleading Advertisement / Unfair Trade Practice", "description": "An advertisement or business practice may be misleading or unfair.", "available": False},
 ]
+_MODULE_BY_ID = {module["id"]: module for module in _MODULES}
 _ANSWER_KEYS = {
     "product_purchased",
     "product_has_problem",
@@ -29,6 +31,15 @@ _ANSWER_KEYS = {
     "problem_evidence_available",
     "seller_communication_available",
 }
+_CASE_ANSWER_KEYS = set(_ANSWER_KEYS)
+_BOOLEAN_ANSWER_KEYS = _ANSWER_KEYS - {"desired_resolution"}
+for _module_id in ConsumerModuleService.available_module_ids():
+    _CASE_ANSWER_KEYS.update(ConsumerModuleService.answer_keys(_module_id))
+    _BOOLEAN_ANSWER_KEYS.update(
+        question["key"]
+        for question in ConsumerModuleService.get_module(_module_id)["questions"]
+        if question["type"] == "boolean"
+    )
 _PUBLIC_ACTIVITY = {
     "Case created",
     "Questions completed",
@@ -85,9 +96,13 @@ def _case_label(case):
 def _case_title(state, case_label):
     module = next((item for item in _MODULES if item["id"] == state.get("module_id")), None)
     issue = module["name"] if module else "New case"
-    product_name = state.get("case_details", {}).get("product_name")
-    if product_name:
-        return f"{product_name} — {issue}"
+    module_id = state.get("module_id")
+    detail_key = "product_name"
+    if module_id in ConsumerModuleService.available_module_ids():
+        detail_key = ConsumerModuleService.get_module(module_id).get("title_detail_key", detail_key)
+    title_detail = state.get("case_details", {}).get(detail_key) or state.get("answers", {}).get(detail_key)
+    if title_detail:
+        return f"{title_detail} — {issue}"
     return f"{issue} — {case_label}"
 
 
@@ -146,6 +161,11 @@ def _read_case_state(cursor, case_id):
         "case_details": {},
         "current_question_key": None,
         "report": None,
+        "facts": {},
+        "derived_facts": {},
+        "reasoning_trace": [],
+        "backward_result": None,
+        "updated_at": None,
         "timeline": [],
     }
     for row in cursor.fetchall():
@@ -154,12 +174,13 @@ def _read_case_state(cursor, case_id):
                 state.update(json.loads(row["fact_value"]))
             except (TypeError, json.JSONDecodeError):
                 continue
-        elif row["fact_key"] in _ANSWER_KEYS:
+        elif row["fact_key"] in _CASE_ANSWER_KEYS:
             value = row["fact_value"]
-            if value == "true":
-                value = True
-            elif value == "false":
-                value = False
+            if row["fact_key"] in _BOOLEAN_ANSWER_KEYS:
+                if value == "true":
+                    value = True
+                elif value == "false":
+                    value = False
             state["answers"][row["fact_key"]] = value
     return state
 
@@ -174,12 +195,16 @@ def _case_response(case, state):
         "case_title": _case_title(state, case_label),
         "session_token": case["session_token"],
         "created_at": created.isoformat() if hasattr(created, "isoformat") else str(created),
+        "updated_at": state.get("updated_at") or (
+            created.isoformat() if hasattr(created, "isoformat") else str(created)
+        ),
         "status": _effective_status(case, state),
         **response_state,
     }
 
 
 def _persist_case_state(cursor, case_id, state):
+    state["updated_at"] = datetime.now(timezone.utc).isoformat()
     cursor.execute("DELETE FROM case_facts WHERE case_id = %s", (case_id,))
     fact_rows = [
         (case_id, key, str(value).lower() if isinstance(value, bool) else str(value))
@@ -190,6 +215,55 @@ def _persist_case_state(cursor, case_id, state):
         "INSERT INTO case_facts (case_id, fact_key, fact_value) VALUES (%s, %s, %s)",
         fact_rows,
     )
+
+
+def _answer_keys_for_module(module_id):
+    if module_id == "defective_product":
+        return _ANSWER_KEYS
+    if module_id in ConsumerModuleService.available_module_ids():
+        return ConsumerModuleService.answer_keys(module_id)
+    return set()
+
+
+def _document_types_for_module(module_id):
+    if module_id == "defective_product":
+        return {
+            "seller_complaint", "replacement_request", "refund_request",
+            "consumer_commission_complaint",
+        }
+    if module_id in ConsumerModuleService.available_module_ids():
+        return {
+            item["type"]
+            for item in ConsumerModuleService.get_module(module_id)["documents"]
+        }
+    return set()
+
+
+def _generate_case_document(module_id, document_type, case, state, consumer_details):
+    service = TemplateGenerationService()
+    document_data = dict(state["case_details"])
+    document_data.update({
+        "case_id": _case_label(case),
+        "answers": state["answers"],
+        "report": state["report"],
+        "desired_resolution": state["answers"].get("desired_resolution"),
+        "selected_resolution": state["answers"].get("desired_resolution"),
+    })
+    if module_id == "defective_product":
+        draft = service.generate_defective_product_document(
+            document_type, document_data, consumer_details
+        )
+    else:
+        draft = service.generate_consumer_module_document(
+            module_id,
+            document_type,
+            _case_label(case),
+            state["case_details"],
+            state["answers"],
+            state["report"],
+            consumer_details,
+        )
+    return draft, TemplateGenerationService._DOCUMENT_TITLES[document_type]
 
 
 @cases_bp.route("/api/cases", methods=["GET"])
@@ -231,6 +305,10 @@ def get_cases():
                 "status": _effective_status(case, state),
                 "created_at": case["created_at"].isoformat()
                 if hasattr(case["created_at"], "isoformat") else str(case["created_at"]),
+                "updated_at": state.get("updated_at") or (
+                    case["created_at"].isoformat()
+                    if hasattr(case["created_at"], "isoformat") else str(case["created_at"])
+                ),
             })
         return jsonify({"success": True, "cases": result}), 200
     except Exception:
@@ -260,6 +338,11 @@ def create_case():
             "case_details": {},
             "current_question_key": None,
             "report": None,
+            "facts": {},
+            "derived_facts": {},
+            "reasoning_trace": [],
+            "backward_result": None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "timeline": [_timeline_event("Case created")],
         }
         cursor.execute(
@@ -304,7 +387,9 @@ def get_case(session_token):
 @cases_bp.route("/api/cases/<session_token>", methods=["PUT"])
 def update_case(session_token):
     data = request.get_json(silent=True) or {}
-    if data.get("module_id") not in (None, "defective_product"):
+    if data.get("module_id") not in (
+        None, "defective_product", *ConsumerModuleService.available_module_ids()
+    ):
         return jsonify({"error": "This module is not available yet."}), 409
     if "answers" in data and not isinstance(data["answers"], dict):
         return jsonify({"error": "Answers must be an object."}), 400
@@ -336,10 +421,13 @@ def update_case(session_token):
             return jsonify({
                 "error": "Generate a case document before completing this case."
             }), 409
-        for key in ("module_id", "answers", "case_details", "current_question_key", "report"):
+        for key in (
+            "module_id", "answers", "case_details", "current_question_key", "report",
+            "facts", "derived_facts", "reasoning_trace", "backward_result",
+        ):
             if key in data:
                 state[key] = data[key]
-        if set(state["answers"]) - _ANSWER_KEYS:
+        if set(state["answers"]) - _answer_keys_for_module(state.get("module_id")):
             return jsonify({"error": "The case contains an unsupported answer."}), 400
 
         if data.get("current_question_key") == "analysis" and previous_question_key != "analysis":
@@ -408,12 +496,7 @@ def preview_case_document(session_token):
     data = request.get_json(silent=True) or {}
     document_type = data.get("document_type")
     consumer_details = data.get("consumer_details")
-    if document_type not in {
-        "seller_complaint",
-        "replacement_request",
-        "refund_request",
-        "consumer_commission_complaint",
-    }:
+    if document_type not in TemplateGenerationService._DOCUMENT_TITLES:
         return jsonify({"error": "Choose a supported document type."}), 400
     if not isinstance(consumer_details, dict):
         return jsonify({"error": "Enter consumer details to continue."}), 400
@@ -435,21 +518,15 @@ def preview_case_document(session_token):
         if not case:
             return jsonify({"error": "Case not found."}), 404
         state = _read_case_state(cursor, case["case_id"])
-        if state.get("module_id") != "defective_product" or not state.get("report"):
-            return jsonify({"error": "Complete the Defective Product analysis first."}), 409
+        module_id = state.get("module_id")
+        if module_id not in _MODULE_BY_ID or not state.get("report"):
+            return jsonify({"error": "Complete the selected module analysis first."}), 409
+        if document_type not in _document_types_for_module(module_id):
+            return jsonify({"error": "Choose a document supported for this issue."}), 400
 
-        document_data = dict(state["case_details"])
-        document_data.update({
-            "case_id": _case_label(case),
-            "answers": state["answers"],
-            "report": state["report"],
-            "desired_resolution": state["answers"].get("desired_resolution"),
-            "selected_resolution": state["answers"].get("desired_resolution"),
-        })
-        draft = TemplateGenerationService().generate_defective_product_document(
-            document_type, document_data, consumer_details
+        draft, title = _generate_case_document(
+            module_id, document_type, case, state, consumer_details
         )
-        title = TemplateGenerationService._DOCUMENT_TITLES[document_type]
         return jsonify({"success": True, "document_type": document_type, "title": title, "preview": draft}), 200
     except ValueError as error:
         conn.rollback()
@@ -467,12 +544,7 @@ def generate_case_document_pdf(session_token):
     data = request.get_json(silent=True) or {}
     document_type = data.get("document_type")
     consumer_details = data.get("consumer_details")
-    if document_type not in {
-        "seller_complaint",
-        "replacement_request",
-        "refund_request",
-        "consumer_commission_complaint",
-    } or not isinstance(consumer_details, dict):
+    if document_type not in TemplateGenerationService._DOCUMENT_TITLES or not isinstance(consumer_details, dict):
         return jsonify({"error": "Choose a document type and provide consumer details."}), 400
     consumer_details = {
         key: str(consumer_details.get(key, "")).strip()
@@ -494,20 +566,14 @@ def generate_case_document_pdf(session_token):
         if not case:
             return jsonify({"error": "Case not found."}), 404
         state = _read_case_state(cursor, case["case_id"])
-        if state.get("module_id") != "defective_product" or not state.get("report"):
-            return jsonify({"error": "Complete the Defective Product analysis first."}), 409
-        document_data = dict(state["case_details"])
-        document_data.update({
-            "case_id": _case_label(case),
-            "answers": state["answers"],
-            "report": state["report"],
-            "desired_resolution": state["answers"].get("desired_resolution"),
-            "selected_resolution": state["answers"].get("desired_resolution"),
-        })
-        draft = TemplateGenerationService().generate_defective_product_document(
-            document_type, document_data, consumer_details
+        module_id = state.get("module_id")
+        if module_id not in _MODULE_BY_ID or not state.get("report"):
+            return jsonify({"error": "Complete the selected module analysis first."}), 409
+        if document_type not in _document_types_for_module(module_id):
+            return jsonify({"error": "Choose a document supported for this issue."}), 400
+        draft, title = _generate_case_document(
+            module_id, document_type, case, state, consumer_details
         )
-        title = TemplateGenerationService._DOCUMENT_TITLES[document_type]
         pdf_bytes = build_legal_document_pdf(title, draft, _case_label(case))
         state.setdefault("generated_documents", []).append({
             "document_type": document_type,
@@ -597,7 +663,7 @@ def get_case_facts(session_token):
         if not case:
             return jsonify({"error": "Case not found."}), 404
         state = _read_case_state(cursor, case["case_id"])
-        return jsonify({"success": True, "facts": state["answers"]}), 200
+        return jsonify({"success": True, "facts": state.get("facts") or state["answers"]}), 200
     except Exception:
         return jsonify({"error": "Unable to load case facts."}), 500
     finally:
