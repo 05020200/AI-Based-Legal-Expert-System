@@ -96,7 +96,10 @@ def test_authenticated_case_is_limited_to_its_owner():
         with other_client.session_transaction() as user_session:
             user_session["user_id"] = user_ids[1]
         assert other_client.get(f"/api/cases/{token}").status_code == 404
+        assert other_client.delete(f"/api/cases/{token}").status_code == 404
         assert owner_client.get(f"/api/cases/{token}").status_code == 200
+        assert owner_client.delete(f"/api/cases/{token}").status_code == 200
+        assert owner_client.get(f"/api/cases/{token}").status_code == 404
     finally:
         cleanup_cases(tokens)
         cursor.executemany(
@@ -106,6 +109,32 @@ def test_authenticated_case_is_limited_to_its_owner():
         connection.commit()
         cursor.close()
         connection.close()
+
+
+def test_guest_can_delete_only_their_case_and_cascade_case_data(client):
+    created_cases = [client.post("/api/cases").get_json()["case"] for _ in range(2)]
+    first, second = created_cases
+    tokens = [first["session_token"], second["session_token"]]
+    try:
+        saved = client.put(f"/api/cases/{first['session_token']}", json={
+            "module_id": "defective_product",
+            "answers": {"product_purchased": True},
+            "case_details": {"problem_description": "Delete cascade check"},
+        })
+        assert saved.status_code == 200
+
+        deleted = client.delete(f"/api/cases/{first['session_token']}")
+        assert deleted.status_code == 200
+        assert client.get(f"/api/cases/{first['session_token']}").status_code == 404
+        assert client.delete(f"/api/cases/{first['session_token']}").status_code == 404
+
+        remaining = client.get("/api/cases").get_json()["cases"]
+        assert [case["session_token"] for case in remaining] == [second["session_token"]]
+        unchanged = client.get(f"/api/cases/{second['session_token']}").get_json()["case"]
+        assert unchanged["status"] == "In Progress"
+        assert unchanged["answers"] == {}
+    finally:
+        cleanup_cases(tokens)
 
 
 def test_only_defective_product_module_is_available(client):
@@ -192,7 +221,16 @@ def test_document_generation_requires_explicit_supported_action(monkeypatch, cli
         cleanup_cases([token])
 
 
-def test_case_status_advances_only_at_workflow_milestones(client):
+def test_case_status_advances_only_at_workflow_milestones(client, monkeypatch):
+    class FakeTemplateGenerationService:
+        _DOCUMENT_TITLES = {"seller_complaint": "SELLER COMPLAINT"}
+
+        def generate_defective_product_document(self, document_type, case_details, consumer_details):
+            return "Seller complaint draft."
+
+    monkeypatch.setattr(
+        case_routes, "TemplateGenerationService", FakeTemplateGenerationService
+    )
     created = client.post("/api/cases")
     token = created.get_json()["case"]["session_token"]
     try:
@@ -208,6 +246,18 @@ def test_case_status_advances_only_at_workflow_milestones(client):
 
         reopened = client.get(f"/api/cases/{token}").get_json()["case"]
         assert reopened["status"] == "Guidance Ready"
+
+        skipped = client.put(f"/api/cases/{token}", json={"status": "Completed"})
+        assert skipped.status_code == 409
+        assert client.get(f"/api/cases/{token}").get_json()["case"]["status"] == "Guidance Ready"
+
+        generated = client.post(f"/api/cases/{token}/documents/pdf", json={
+            "document_type": "seller_complaint",
+            "consumer_details": {"consumer_name": "Priya S"},
+        })
+        assert generated.status_code == 200
+        assert generated.mimetype == "application/pdf"
+        assert client.get(f"/api/cases/{token}").get_json()["case"]["status"] == "Document Ready"
 
         complete = client.put(f"/api/cases/{token}", json={"status": "Completed"})
         assert complete.get_json()["case"]["status"] == "Completed"

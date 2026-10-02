@@ -326,6 +326,16 @@ def update_case(session_token):
         previous_question_key = state.get("current_question_key")
         previous_report = state.get("report")
         previous_status = _effective_status(case, state)
+        if data.get("status") == "Completed" and not (
+            state.get("generated_documents")
+            or any(
+                event.get("event") == "Document generated"
+                for event in state.get("timeline", [])
+            )
+        ):
+            return jsonify({
+                "error": "Generate a case document before completing this case."
+            }), 409
         for key in ("module_id", "answers", "case_details", "current_question_key", "report"):
             if key in data:
                 state[key] = data[key]
@@ -363,6 +373,31 @@ def update_case(session_token):
     except Exception:
         conn.rollback()
         return jsonify({"error": "Unable to save this case."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@cases_bp.route("/api/cases/<session_token>", methods=["DELETE"])
+def delete_case(session_token):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed."}), 500
+    cursor = conn.cursor(dictionary=True)
+    try:
+        case = _case_access(cursor, session_token)
+        if not case:
+            return jsonify({"error": "Case not found."}), 404
+        cursor.execute("DELETE FROM cases WHERE case_id = %s", (case["case_id"],))
+        conn.commit()
+        if session.get("user_id") is None:
+            session["guest_case_tokens"] = [
+                token for token in _guest_tokens() if token != session_token
+            ]
+        return jsonify({"success": True}), 200
+    except Exception:
+        conn.rollback()
+        return jsonify({"error": "Unable to delete this case."}), 500
     finally:
         cursor.close()
         conn.close()
