@@ -273,7 +273,11 @@ class DefectiveProductService:
         }
 
         if issue_identified:
-            if "consumer_guidance_required" in conclusions:
+            if facts.get("seller_resolved") is True:
+                assessment = (
+                    "You reported that the seller has resolved the issue. This report does not determine whether the product was legally defective or whether any further action is appropriate."
+                )
+            elif "consumer_guidance_required" in conclusions:
                 assessment = (
                     "Based on the information provided, this may indicate a possible consumer dispute involving a defect in the product."
                 )
@@ -292,6 +296,10 @@ class DefectiveProductService:
                     why_relevant += (
                         "You also reported contacting the seller and that the issue was not resolved. "
                     )
+                elif facts.get("seller_resolved") is True:
+                    why_relevant += (
+                        "You reported that the seller has resolved the issue. "
+                    )
                 else:
                     why_relevant += "You reported contacting the seller about the issue. "
             evidence_names = [
@@ -307,15 +315,18 @@ class DefectiveProductService:
                 "Section 2(10) of the Consumer Protection Act, 2019. This report does not determine "
                 "whether a defect has been legally established or guarantee any particular remedy."
             )
-            possible_options = [
-                "You may ask the seller about repair, replacement, or refund, depending on the circumstances and applicable law."
-            ]
-            if "consumer_guidance_required" in conclusions:
-                possible_options.append(
-                    "If the issue remains unresolved, you may consider grievance support or a formal consumer complaint under the applicable procedure."
-                )
-            if desired_resolution:
-                possible_options.append(f"Your stated preference is: {desired_resolution}.")
+            if facts.get("seller_resolved") is True:
+                possible_options = ["You reported that the seller has resolved the issue."]
+            else:
+                possible_options = [
+                    "You may ask the seller about repair, replacement, or refund, depending on the circumstances and applicable law."
+                ]
+                if "consumer_guidance_required" in conclusions:
+                    possible_options.append(
+                        "If the issue remains unresolved, you may consider grievance support or a formal consumer complaint under the applicable procedure."
+                    )
+                if desired_resolution:
+                    possible_options.append(f"Your stated preference is: {desired_resolution}.")
         else:
             assessment = (
                 "The answers provided do not currently establish the Phase 1 conditions for a possible defective-product issue. "
@@ -329,23 +340,28 @@ class DefectiveProductService:
                 if desired_resolution else []
             )
 
-        next_steps = [
-            "Keep the purchase invoice or receipt, photographs or videos of the product problem, and copies of seller communications you have.",
-        ]
-        if facts.get("seller_contacted") is False:
-            next_steps.insert(
-                0,
-                "Consider making a written complaint to the seller describing the product problem and your preferred resolution; keep a copy.",
-            )
-        elif facts.get("seller_contacted") is True and facts.get("seller_resolved") is False:
-            next_steps.insert(
-                0,
-                "Keep a dated record of your contact with the seller and any response.",
-            )
-        next_steps.extend([
-            "Keep your order, invoice, and complaint/reference number together with the other records you have.",
-            "If the problem remains unresolved, consider seeking grievance assistance or making a complaint before the competent Consumer Commission; check current official filing instructions.",
-        ])
+        if facts.get("seller_resolved") is True:
+            next_steps = [
+                "Keep your purchase proof, communication with the seller, and records of how the issue was resolved.",
+            ]
+        else:
+            next_steps = [
+                "Keep the purchase invoice or receipt, photographs or videos of the product problem, and copies of seller communications you have.",
+            ]
+            if facts.get("seller_contacted") is False:
+                next_steps.insert(
+                    0,
+                    "Consider making a written complaint to the seller describing the product problem and your preferred resolution; keep a copy.",
+                )
+            elif facts.get("seller_contacted") is True and facts.get("seller_resolved") is False:
+                next_steps.insert(
+                    0,
+                    "Keep a dated record of your contact with the seller and any response.",
+                )
+            next_steps.extend([
+                "Keep your order, invoice, and complaint/reference number together with the other records you have.",
+                "If the problem remains unresolved, consider seeking grievance assistance or making a complaint before the competent Consumer Commission; check current official filing instructions.",
+            ])
 
         report = {
             "title": "Defective Product Legal Guidance Report",

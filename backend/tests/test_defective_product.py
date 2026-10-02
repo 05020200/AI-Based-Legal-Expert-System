@@ -221,6 +221,34 @@ def test_report_uses_section_210_limited_evidence_and_preserves_case_details():
     assert len(result["internal"]["reasoning_trace"]) == 3
 
 
+def test_resolved_issue_guidance_recommends_records_without_dispute_actions():
+    resolved = DefectiveProductService.analyze(
+        complete_answers(seller_resolved=True),
+        {"product_name": "Phone X"},
+    )["report"]
+    unresolved = DefectiveProductService.analyze(
+        complete_answers(seller_resolved=False),
+        {"product_name": "Phone X"},
+    )["report"]
+
+    assert resolved["assessment"].startswith(
+        "You reported that the seller has resolved the issue."
+    )
+    assert "seller has resolved the issue" in resolved["why_relevant"]
+    assert resolved["possible_options"] == [
+        "You reported that the seller has resolved the issue."
+    ]
+    assert resolved["next_steps"] == [
+        "Keep your purchase proof, communication with the seller, and records of how the issue was resolved."
+    ]
+    assert {item["section_number"] for item in resolved["legal_provisions"]} == {
+        "Section 2(10)",
+        "Section 35",
+    }
+    assert any("formal consumer complaint" in item for item in unresolved["possible_options"])
+    assert any("remains unresolved" in item for item in unresolved["next_steps"])
+
+
 def test_api_questions_and_report_keep_guest_flow_without_internal_reasoning(client):
     questions_response = client.get("/api/phase1/questions")
     assert questions_response.status_code == 200

@@ -335,3 +335,59 @@ def test_pdf_export_returns_pdf_and_records_event(client):
         assert reopened["timeline"][-1]["event"] == "PDF exported"
     finally:
         cleanup_cases([token])
+
+
+def test_resolved_case_pdf_keeps_law_but_omits_complaint_guidance(client):
+    pytest.importorskip("reportlab")
+    created = client.post("/api/cases")
+    token = created.get_json()["case"]["session_token"]
+    try:
+        saved = client.put(f"/api/cases/{token}", json={
+            "module_id": "defective_product",
+            "answers": {
+                "product_purchased": True,
+                "product_has_problem": True,
+                "seller_contacted": True,
+                "seller_resolved": True,
+            },
+            "case_details": {"product_name": "Resolved Product"},
+            "report": {
+                "title": "Defective Product Legal Guidance Report",
+                "possible_issue": "The seller resolved the reported issue.",
+                "why_relevant": "The reported issue has been resolved.",
+                "case_summary": {
+                    "product_purchased": True,
+                    "product_has_problem": True,
+                    "seller_response_resolution": {"problem_resolved": True},
+                },
+                "legal_provisions": [{
+                    "act_name": "Consumer Protection Act, 2019",
+                    "section_number": "Section 2(10)",
+                    "title": "Defect",
+                    "description": "Relevant law remains available.",
+                }],
+                "evidence_checklist": [],
+                "possible_options": ["You reported that the seller resolved the issue."],
+                "next_steps": ["Keep purchase and resolution records."],
+                "where_to_complain": {
+                    "grievance_support": {"name": "National Consumer Helpline", "phone": "1915"},
+                    "formal_complaint": {"message": "File a complaint before the Consumer Commission."},
+                },
+                "disclaimer": "Preliminary legal information only.",
+            },
+        })
+        assert saved.status_code == 200
+
+        response = client.get(f"/api/cases/{token}/pdf")
+        assert response.status_code == 200
+        pdf_text = "\n".join(
+            page.extract_text() or ""
+            for page in PdfReader(BytesIO(response.data)).pages
+        )
+        assert "Relevant Law" in pdf_text
+        assert "Section 2(10)" in pdf_text
+        assert "Where To Complain" not in pdf_text
+        assert "National Consumer Helpline" not in pdf_text
+        assert "File a complaint before the Consumer Commission" not in pdf_text
+    finally:
+        cleanup_cases([token])

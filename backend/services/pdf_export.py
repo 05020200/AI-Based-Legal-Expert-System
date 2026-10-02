@@ -210,31 +210,32 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline, case_tit
     for step_number, step in enumerate(report.get("next_steps", []), start=1):
         story.append(_paragraph(f"{step_number}. {step}", body_style))
 
-    story.append(Paragraph("Where To Complain", heading_style))
-    complaint = report.get("where_to_complain") or {}
-    grievance = complaint.get("grievance_support") or {}
-    if grievance:
-        contacts = ", ".join(
-            value for value in (grievance.get("phone"), grievance.get("alternate_phone")) if value
-        )
-        story.append(_paragraph(
-            f"{grievance.get('name')}: {contacts}; {grievance.get('url')}. {grievance.get('description')}",
-            body_style,
-        ))
-    formal = complaint.get("formal_complaint") or {}
-    if formal:
-        story.append(_paragraph(formal.get("message"), body_style))
-    pecuniary = complaint.get("pecuniary_jurisdiction") or {}
-    if pecuniary.get("determined"):
-        story.append(_paragraph(
-            f"Informational jurisdiction estimate: {pecuniary.get('authority')} based on consideration paid of {_format_amount(pecuniary.get('consideration_paid'))}. {pecuniary.get('message')}",
-            body_style,
-        ))
-    else:
-        story.append(_paragraph(pecuniary.get("message"), body_style))
-    story.append(_paragraph(complaint.get("territorial_note"), body_style))
-    for factor in complaint.get("territorial_jurisdiction_factors", []):
-        story.append(_paragraph(f"• {factor}", small_style))
+    if resolution.get("problem_resolved") is not True:
+        story.append(Paragraph("Where To Complain", heading_style))
+        complaint = report.get("where_to_complain") or {}
+        grievance = complaint.get("grievance_support") or {}
+        if grievance:
+            contacts = ", ".join(
+                value for value in (grievance.get("phone"), grievance.get("alternate_phone")) if value
+            )
+            story.append(_paragraph(
+                f"{grievance.get('name')}: {contacts}; {grievance.get('url')}. {grievance.get('description')}",
+                body_style,
+            ))
+        formal = complaint.get("formal_complaint") or {}
+        if formal:
+            story.append(_paragraph(formal.get("message"), body_style))
+        pecuniary = complaint.get("pecuniary_jurisdiction") or {}
+        if pecuniary.get("determined"):
+            story.append(_paragraph(
+                f"Informational jurisdiction estimate: {pecuniary.get('authority')} based on consideration paid of {_format_amount(pecuniary.get('consideration_paid'))}. {pecuniary.get('message')}",
+                body_style,
+            ))
+        else:
+            story.append(_paragraph(pecuniary.get("message"), body_style))
+        story.append(_paragraph(complaint.get("territorial_note"), body_style))
+        for factor in complaint.get("territorial_jurisdiction_factors", []):
+            story.append(_paragraph(f"• {factor}", small_style))
 
     if timeline:
         story.append(Paragraph("Case Activity", heading_style))
