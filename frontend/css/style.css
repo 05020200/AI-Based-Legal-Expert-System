@@ -128,3 +128,57 @@ body { font-family: var(--font-family); background-color: var(--background-color
     .summary-list > div { grid-template-columns: minmax(100px, 0.8fr) minmax(0, 1.2fr); }
     .export-btn { position: static; margin-top: 0.6rem; }
 }
+
+.auth-shell { min-height: 100vh; width: 100%; display: grid; place-items: center; padding: 1.25rem; background: radial-gradient(circle at top left, #e6f2f1 0, transparent 38%), linear-gradient(135deg, #f7fafc, #edf3f7); }
+.auth-panel { width: min(100%, 430px); padding: 2rem; border: 1px solid var(--border-color); border-top: 4px solid #287d78; background: var(--white); box-shadow: 0 16px 40px rgba(28, 54, 70, 0.09); }
+.auth-panel h1 { margin-bottom: 0.3rem; color: var(--primary-color); font-size: 2rem; }
+.auth-kicker { margin-bottom: 0.4rem !important; color: #287d78 !important; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.auth-subtitle { margin-bottom: 1.4rem; color: var(--text-muted); }
+.auth-form { display: grid; gap: 0.9rem; }
+.auth-form label { display: grid; gap: 0.35rem; font-size: 0.85rem; font-weight: 600; }
+.auth-form input { width: 100%; min-width: 0; padding: 0.7rem; border: 1px solid var(--border-color); border-radius: 3px; font: inherit; }
+.auth-form > button[type="submit"], .guest-button { min-height: 42px; border: 0; border-radius: 3px; background: #287d78; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+.guest-button { width: 100%; margin-top: 0.7rem; background: #eef4f3; color: #225f5b; }
+.text-button { border: 0; background: none; color: var(--primary-light); text-align: left; font: inherit; cursor: pointer; }
+.auth-message { min-height: 1.4rem; margin-top: 0.8rem; color: #9a3d34; font-size: 0.85rem; }
+.workflow-screen { max-width: 780px; width: 100%; margin: auto; }
+.workflow-screen h1 { margin: 0.25rem 0 0.65rem; color: var(--primary-color); font-size: 1.65rem; }
+.workflow-screen > p:not(.auth-kicker) { margin-bottom: 1.4rem; color: var(--text-muted); line-height: 1.5; }
+.question-progress { display: inline-block; margin: 0.5rem 0 1.2rem; padding: 0.35rem 0.6rem; border-left: 3px solid #287d78; background: #eef4f3; color: #225f5b !important; font-size: 0.85rem; font-weight: 700; }
+.question-fields { display: block; max-width: 680px; }
+.question-fields { display: block; grid-template-columns: minmax(0, 1fr); }
+.question-field { width: 100%; min-height: 150px; padding: 1.4rem 0; border-top: 1px solid var(--border-color); }
+.question-field legend, .question-field > span { margin-bottom: 1rem; font-size: 1.05rem; }
+.answer-options { gap: 0.75rem; }
+.answer-option { min-width: 100px; justify-content: center; padding: 0.65rem 1rem; }
+.question-navigation { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-top: 1rem; }
+.question-navigation button { margin: 0; min-width: 100px; }
+.workflow-back { min-height: 40px; padding: 0.6rem 0.9rem; border: 1px solid var(--border-color); border-radius: 3px; background: white; color: var(--text-main); font: inherit; cursor: pointer; }
+.workflow-back:hover { background: #eef4f3; }
+.module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.module-card { display: flex; flex-direction: column; align-items: flex-start; min-height: 165px; padding: 1rem; border: 1px solid var(--border-color); border-left: 3px solid #287d78; background: white; }
+.module-card h2 { margin-bottom: 0.55rem; font-size: 1rem; color: var(--primary-color); }
+.module-card p { flex: 1; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; }
+.module-card button { min-height: 34px; padding: 0.35rem 0.7rem; border: 1px solid #287d78; border-radius: 3px; background: white; color: #225f5b; font: inherit; cursor: pointer; }
+.module-card button:disabled { border-color: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+.dashboard-cases { display: grid; gap: 0.5rem; list-style: none; }
+.dashboard-case { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--border-color); }
+.dashboard-case > div { display: grid; gap: 0.25rem; }
+.dashboard-case span, .empty-cases { color: var(--text-muted); font-size: 0.85rem; }
+.dashboard-case button, .case-history-button { max-width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-color); border-radius: 3px; background: white; color: var(--text-main); font: inherit; cursor: pointer; }
+.case-history-button { width: 100%; border: 0; padding: 0.35rem; text-align: left; font-size: 0.83rem; }
+.case-number { color: var(--text-muted); font-size: 0.8rem; }
+.evidence-report-list { max-width: 680px; list-style: none; }
+.evidence-report-list li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 1rem 0; border-bottom: 1px solid var(--border-color); }
+.evidence-report-list li > span:last-child { color: var(--text-muted); font-size: 0.85rem; }
+.evidence-mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 700; }
+.evidence-mark.available { background: #e2f2e9; color: #246a46; }
+.evidence-mark.unavailable { background: #f6e8e5; color: #9a3d34; }
+
+@media (max-width: 800px) {
+    .auth-panel { padding: 1.4rem; }
+    .module-grid { grid-template-columns: minmax(0, 1fr); }
+    .module-card { min-height: 145px; }
+    .workflow-screen h1 { font-size: 1.4rem; }
+    .question-field { min-height: 130px; }
+}

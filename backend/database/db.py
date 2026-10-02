@@ -1,6 +1,10 @@
 # pyrefly: ignore [missing-import]
 import mysql.connector
-from config import Config
+
+try:
+    from ..config import Config
+except ImportError:
+    from config import Config
 
 
 def get_db_connection():

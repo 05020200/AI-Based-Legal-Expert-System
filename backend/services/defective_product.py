@@ -113,18 +113,84 @@ class DefectiveProductService:
         return questions
 
     @classmethod
+    def get_visible_questions(cls, answers: Dict[str, Any]) -> List[Dict[str, Any]]:
+        questions = {question["key"]: question for question in cls.get_questions()}
+        visible_keys = ["product_purchased"]
+
+        if answers.get("product_purchased") is True:
+            visible_keys.append("product_has_problem")
+            if answers.get("product_has_problem") is True:
+                visible_keys.append("seller_contacted")
+                if answers.get("seller_contacted") is True:
+                    visible_keys.append("seller_resolved")
+                visible_keys.extend([
+                    "desired_resolution",
+                    "purchase_proof_available",
+                    "problem_evidence_available",
+                    "seller_communication_available",
+                ])
+
+        return [questions[key] for key in visible_keys]
+
+    @classmethod
+    def get_next_question(
+        cls,
+        answers: Dict[str, Any],
+        current_key: str = None,
+        direction: str = "next",
+    ) -> Dict[str, Any]:
+        if direction not in {"current", "next", "previous"}:
+            raise ValueError("Direction must be 'current', 'next', or 'previous'.")
+        visible_questions = cls.get_visible_questions(answers)
+        visible_keys = [question["key"] for question in visible_questions]
+        if current_key not in visible_keys:
+            index = 0
+        else:
+            index = visible_keys.index(current_key)
+            if direction == "previous":
+                index = max(0, index - 1)
+            elif direction == "next":
+                index += 1
+
+        question = visible_questions[index] if index < len(visible_questions) else None
+        return {
+            "question": question,
+            "step": index + 1 if question else len(visible_questions),
+            "total": len(visible_questions),
+        }
+
+    @classmethod
     def analyze(
         cls, answers: Dict[str, Any], case_details: Dict[str, Any]
     ) -> Dict[str, Any]:
         expected_boolean_keys = {question["key"] for question in _BOOLEAN_QUESTIONS}
-        if any(type(answers.get(key)) is not bool for key in expected_boolean_keys):
-            raise ValueError("Please answer all yes/no questions.")
+        allowed_answer_keys = expected_boolean_keys | {"desired_resolution"}
+        if set(answers) - allowed_answer_keys:
+            raise ValueError("An unsupported questionnaire answer was provided.")
+        if type(answers.get("product_purchased")) is not bool:
+            raise ValueError("Please answer whether the product was purchased from a seller or business.")
+        if answers["product_purchased"]:
+            if type(answers.get("product_has_problem")) is not bool:
+                raise ValueError("Please answer whether the product has a problem.")
+            if answers["product_has_problem"]:
+                if type(answers.get("seller_contacted")) is not bool:
+                    raise ValueError("Please answer whether you contacted the seller.")
+                if answers["seller_contacted"] and type(answers.get("seller_resolved")) is not bool:
+                    raise ValueError("Please answer whether the seller resolved the problem.")
+                evidence_keys = {
+                    "purchase_proof_available",
+                    "problem_evidence_available",
+                    "seller_communication_available",
+                }
+                if any(type(answers.get(key)) is not bool for key in evidence_keys):
+                    raise ValueError("Please answer all evidence questions for this product issue.")
         desired_resolution = answers.get("desired_resolution")
-        if desired_resolution not in _RESOLUTIONS:
+        if desired_resolution is not None and desired_resolution not in _RESOLUTIONS:
             raise ValueError("Choose a valid desired resolution.")
+        if answers["product_purchased"] and answers.get("product_has_problem") and not desired_resolution:
+            raise ValueError("Choose a desired resolution for this product problem.")
 
-        facts = {key: answers[key] for key in expected_boolean_keys}
-        facts["desired_resolution"] = desired_resolution
+        facts = dict(answers)
         memory = WorkingMemory()
         for key, value in facts.items():
             memory.add_fact(key, str(value).lower() if isinstance(value, bool) else value)
@@ -145,7 +211,7 @@ class DefectiveProductService:
         available_evidence = [
             identifier
             for identifier, fact_key in _EVIDENCE_FACTS.items()
-            if facts[fact_key]
+            if facts.get(fact_key) is True
         ]
         documents = DocumentRecommendationService().recommend(
             "Defective Product", available_documents=available_evidence
@@ -153,7 +219,7 @@ class DefectiveProductService:
         evidence_checklist = [
             {
                 "name": document["name"],
-                "available": facts[_EVIDENCE_FACTS[document["id"]]],
+                "available": facts.get(_EVIDENCE_FACTS[document["id"]]),
             }
             for document in documents["recommended_documents_display"]
         ]
@@ -161,17 +227,17 @@ class DefectiveProductService:
         details = cls._normalize_case_details(case_details)
         summary = {
             "selected_issue": "Defective Product",
-            "product_purchased": facts["product_purchased"],
-            "product_has_problem": facts["product_has_problem"],
+            "product_purchased": facts.get("product_purchased"),
+            "product_has_problem": facts.get("product_has_problem"),
             "product_name": details.get("product_name"),
             "seller_name": details.get("seller_name"),
             "purchase_date": details.get("purchase_date"),
             "amount_paid": details.get("amount_paid"),
             "order_or_invoice_number": details.get("order_or_invoice_number"),
             "problem_situation": details.get("problem_description"),
-            "seller_contacted": facts["seller_contacted"],
+            "seller_contacted": facts.get("seller_contacted"),
             "seller_response_resolution": {
-                "problem_resolved": facts["seller_resolved"],
+                "problem_resolved": facts.get("seller_resolved"),
                 "response_details": details.get("seller_response"),
             },
             "desired_resolution": desired_resolution,
@@ -189,9 +255,10 @@ class DefectiveProductService:
                 "Those facts may be relevant to whether the goods have a defect; this report does not decide that question."
             )
             possible_options = [
-                "You may ask the seller about repair, replacement, or refund, depending on the circumstances and applicable law.",
-                f"Your stated preference is: {desired_resolution}.",
+                "You may ask the seller about repair, replacement, or refund, depending on the circumstances and applicable law."
             ]
+            if desired_resolution:
+                possible_options.append(f"Your stated preference is: {desired_resolution}.")
         else:
             assessment = (
                 "The answers provided do not currently establish the Phase 1 conditions for a possible defective-product issue. "
@@ -200,19 +267,20 @@ class DefectiveProductService:
             why_relevant = (
                 "The rule-based assessment looks for both a product purchase from a seller or business and a reported product problem."
             )
-            possible_options = [
-                f"Your stated preference is: {desired_resolution}.",
-            ]
+            possible_options = (
+                [f"Your stated preference is: {desired_resolution}."]
+                if desired_resolution else []
+            )
 
         next_steps = [
             "Keep the purchase receipt, clear photographs or videos of the problem, and copies of relevant seller communications.",
         ]
-        if not facts["seller_contacted"]:
+        if facts.get("seller_contacted") is False:
             next_steps.insert(
                 0,
                 "Consider contacting the seller in writing, describing the problem and the resolution you prefer; keep a copy of the message.",
             )
-        elif not facts["seller_resolved"]:
+        elif facts.get("seller_contacted") is True and facts.get("seller_resolved") is False:
             next_steps.insert(
                 0,
                 "Keep a dated record of your contact with the seller and any response.",

@@ -6,6 +6,8 @@ USE legal_expert_system;
 CREATE TABLE IF NOT EXISTS users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) NOT NULL UNIQUE,
+    full_name VARCHAR(100),
+    email VARCHAR(254) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -129,7 +131,7 @@ CREATE TABLE IF NOT EXISTS case_facts (
     fact_id INT AUTO_INCREMENT PRIMARY KEY,
     case_id INT,
     fact_key VARCHAR(100),
-    fact_value VARCHAR(255),
+    fact_value TEXT,
     FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE
 );
 

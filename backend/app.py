@@ -4,6 +4,8 @@ import os
 import json
 
 from config import Config
+from routes.auth import auth_bp
+from routes.cases import cases_bp
 
 # Inference engine and services
 from inference_engine.working_memory import WorkingMemory
@@ -28,7 +30,9 @@ app.secret_key = 'super-secret-legal-key'
 CORS(app, supports_credentials=True)
 app.config.from_object(Config)
 
-# Auth routes are disabled — no blueprint registered.
+app.register_blueprint(auth_bp)
+app.register_blueprint(cases_bp)
+
 # Cases routes are disabled — no DB-backed case management needed yet.
 
 # ---------------------------------------------------------
@@ -94,6 +98,23 @@ def phase1_questions():
     return jsonify({"questions": DefectiveProductService.get_questions()}), 200
 
 
+@app.route("/api/phase1/question", methods=["POST"])
+def phase1_question():
+    data = request.get_json(silent=True) or {}
+    answers = data.get("answers", {})
+    current_key = data.get("current_key")
+    direction = data.get("direction", "next")
+    if not isinstance(answers, dict) or not isinstance(current_key, (str, type(None))):
+        return jsonify({"error": "Invalid question navigation data."}), 400
+    try:
+        result = DefectiveProductService.get_next_question(
+            answers, current_key, direction
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    return jsonify(result), 200
+
+
 @app.route("/api/phase1/analyze", methods=["POST"])
 def analyze_defective_product():
     if not request.is_json:
@@ -104,19 +125,6 @@ def analyze_defective_product():
     case_details = data.get("case_details", {})
     if not isinstance(answers, dict) or not isinstance(case_details, dict):
         return jsonify({"error": "Answers and case details must be objects."}), 400
-
-    required_keys = {
-        "product_purchased",
-        "product_has_problem",
-        "seller_contacted",
-        "seller_resolved",
-        "desired_resolution",
-        "purchase_proof_available",
-        "problem_evidence_available",
-        "seller_communication_available",
-    }
-    if not required_keys.issubset(answers):
-        return jsonify({"error": "Please answer all eight questionnaire questions."}), 400
 
     try:
         result = DefectiveProductService.analyze(answers, case_details)

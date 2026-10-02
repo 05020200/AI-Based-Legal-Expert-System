@@ -9,21 +9,42 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-layout">
+    <main id="auth-state" class="auth-shell">
+        <section class="auth-panel">
+            <p class="auth-kicker">Consumer legal information</p>
+            <h1>LegalAssist</h1>
+            <p class="auth-subtitle">AI-Based Legal Expert System</p>
+            <form id="login-form" class="auth-form">
+                <label>Email or username<input name="username" autocomplete="username" required></label>
+                <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+                <button type="submit">Login</button>
+                <button id="show-register" class="text-button" type="button">Create an account</button>
+            </form>
+            <form id="register-form" class="auth-form hidden">
+                <label>Name<input name="name" autocomplete="name" required></label>
+                <label>Email<input name="email" type="email" autocomplete="email" required></label>
+                <label>Password<input name="password" type="password" autocomplete="new-password" required minlength="8"></label>
+                <label>Confirm password<input name="confirm_password" type="password" autocomplete="new-password" required minlength="8"></label>
+                <button type="submit">Register</button>
+                <button id="show-login" class="text-button" type="button">Back to login</button>
+            </form>
+            <button id="guest-entry" class="guest-button" type="button">Continue as Guest</button>
+            <p id="auth-message" class="auth-message" role="status"></p>
+        </section>
+    </main>
+
+    <div class="app-layout hidden" id="application">
         <!-- LEFT SIDEBAR -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2>⚖ LegalAssist</h2>
             </div>
             
-            <button id="new-chat-btn" class="new-chat-btn">
-                <span>+</span> New Case
-            </button>
+            <button id="new-chat-btn" class="new-chat-btn"><span>+</span> New Case</button>
 
             <div class="chat-history">
                 <h3>Recent Cases</h3>
                 <ul id="history-list">
-                    <!-- History items will be dynamically added here -->
                 </ul>
             </div>
 
@@ -34,6 +55,7 @@
                     <div class="avatar" id="user-avatar">G</div>
                     <span id="user-name-display">Guest</span>
                 </div>
+                <button id="logout-btn" class="logout-btn hidden" type="button">Logout</button>
             </div>
         </aside>
 
@@ -47,27 +69,65 @@
 
             <div class="chat-wrapper">
                 <div class="chat-container" id="chat-container">
-                    <div id="welcome-state" class="welcome-state">
-                        <div class="welcome-icon">⚖</div>
+                    <section id="dashboard-state" class="workflow-screen welcome-state hidden">
+                        <p class="auth-kicker">Workspace</p>
+                        <h1 id="dashboard-greeting">Welcome</h1>
+                        <p>Your consumer cases</p>
+                        <button id="dashboard-new-case" class="submit-questionnaire" type="button">+ New Case</button>
+                        <h2>Recent Cases</h2>
+                        <ul id="dashboard-cases" class="dashboard-cases"></ul>
+                    </section>
+
+                    <section id="module-selection" class="workflow-screen hidden">
+                        <p class="auth-kicker">New Case</p>
+                        <h1>Select Your Legal Issue</h1>
+                        <p>Choose the issue that best matches your situation.</p>
+                        <div id="module-cards" class="module-grid"></div>
+                        <button class="workflow-back" data-screen="dashboard" type="button">Back to dashboard</button>
+                    </section>
+
+                    <section id="interview-state" class="workflow-screen hidden">
+                        <p class="auth-kicker">Defective Product</p>
                         <h1>Defective Product</h1>
-                        <p>Answer a few questions to receive preliminary legal information about a product problem.</p>
+                        <p id="question-progress" class="question-progress"></p>
                         <form id="questionnaire" class="questionnaire">
                             <div id="question-fields" class="question-fields"></div>
-                            <fieldset class="details-fields">
-                                <legend>Optional case details</legend>
-                                <div class="detail-grid">
-                                    <label>Product name<input name="product_name" autocomplete="off"></label>
-                                    <label>Seller or business name<input name="seller_name" autocomplete="organization"></label>
-                                    <label>Purchase date<input name="purchase_date" type="date"></label>
-                                    <label>Amount paid<input name="amount_paid" type="number" min="0" step="any" inputmode="decimal"></label>
-                                    <label>Order or invoice number<input name="order_or_invoice_number" autocomplete="off"></label>
-                                    <label class="wide-field">Describe the product problem<textarea name="problem_description" rows="3"></textarea></label>
-                                    <label class="wide-field">What did the seller say or do?<textarea name="seller_response" rows="3"></textarea></label>
-                                </div>
-                            </fieldset>
-                            <button class="submit-questionnaire" type="submit">Prepare guidance report</button>
+                            <div class="question-navigation">
+                                <button id="question-back" class="workflow-back" type="button">Back</button>
+                                <button id="question-next" class="submit-questionnaire" type="submit">Next</button>
+                            </div>
                         </form>
-                    </div>
+                    </section>
+
+                    <section id="details-state" class="workflow-screen hidden">
+                        <p class="auth-kicker">Defective Product</p>
+                        <h1>Additional Case Details</h1>
+                        <form id="details-form" class="questionnaire">
+                            <div class="detail-grid">
+                                <label>Product name<input name="product_name" autocomplete="off"></label>
+                                <label>Seller / business name<input name="seller_name" autocomplete="organization"></label>
+                                <label>Purchase date<input name="purchase_date" type="date"></label>
+                                <label>Amount paid<input name="amount_paid" type="number" min="0" step="any" inputmode="decimal"></label>
+                                <label>Order / invoice number<input name="order_or_invoice_number" autocomplete="off"></label>
+                                <label class="wide-field">Describe the product problem<textarea name="problem_description" rows="3"></textarea></label>
+                                <label class="wide-field">What did the seller say or do?<textarea name="seller_response" rows="3"></textarea></label>
+                            </div>
+                            <div class="question-navigation">
+                                <button id="skip-details" class="workflow-back" type="button">Skip</button>
+                                <button class="submit-questionnaire" type="submit">Continue</button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section id="evidence-state" class="workflow-screen hidden">
+                        <p class="auth-kicker">Defective Product</p>
+                        <h1>Evidence Report</h1>
+                        <p>Evidence availability is based on your answers.</p>
+                        <ul id="evidence-report-list" class="evidence-report-list"></ul>
+                        <div class="question-navigation">
+                            <button id="evidence-continue" class="submit-questionnaire" type="button">Continue to guidance</button>
+                        </div>
+                    </section>
 
                     <div id="chat-messages" class="chat-messages"></div>
                     

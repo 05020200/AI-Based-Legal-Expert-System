@@ -81,6 +81,51 @@ def test_questionnaire_contains_required_phase1_questions():
     ]
 
 
+def test_question_navigation_skips_irrelevant_questions_and_supports_back():
+    first = DefectiveProductService.get_next_question({})
+    assert first["question"]["key"] == "product_purchased"
+    assert (first["step"], first["total"]) == (1, 1)
+
+    no_purchase = DefectiveProductService.get_visible_questions({
+        "product_purchased": False,
+    })
+    assert [question["key"] for question in no_purchase] == ["product_purchased"]
+
+    seller_not_contacted = DefectiveProductService.get_visible_questions({
+        "product_purchased": True,
+        "product_has_problem": True,
+        "seller_contacted": False,
+    })
+    assert [question["key"] for question in seller_not_contacted] == [
+        "product_purchased",
+        "product_has_problem",
+        "seller_contacted",
+        "desired_resolution",
+        "purchase_proof_available",
+        "problem_evidence_available",
+        "seller_communication_available",
+    ]
+
+    previous = DefectiveProductService.get_next_question(
+        {"product_purchased": True}, "product_has_problem", "previous"
+    )
+    assert previous["question"]["key"] == "product_purchased"
+    resumed = DefectiveProductService.get_next_question(
+        {"product_purchased": True}, "product_has_problem", "current"
+    )
+    assert resumed["question"]["key"] == "product_has_problem"
+
+
+def test_question_navigation_api_returns_one_question_only(client):
+    response = client.post("/api/phase1/question", json={
+        "answers": {"product_purchased": True},
+        "current_key": "product_purchased",
+    })
+    assert response.status_code == 200
+    assert response.get_json()["question"]["key"] == "product_has_problem"
+    assert set(response.get_json()) == {"question", "step", "total"}
+
+
 def test_answers_become_unique_working_memory_facts_and_forward_conclusions():
     result = DefectiveProductService.analyze(
         complete_answers(), {"product_name": "Phone"}
@@ -187,4 +232,21 @@ def test_api_questions_and_report_keep_guest_flow_without_internal_reasoning(cli
 def test_api_rejects_incomplete_questionnaire(client):
     response = client.post("/api/phase1/analyze", json={"answers": {}})
     assert response.status_code == 400
-    assert "all eight" in response.get_json()["error"]
+    assert "product was purchased" in response.get_json()["error"]
+
+
+def test_conditional_analysis_preserves_unanswered_fields_as_unprovided(monkeypatch):
+    monkeypatch.setattr(
+        defective_product,
+        "DocumentRecommendationService",
+        FakeDocumentRecommendationService,
+    )
+    result = DefectiveProductService.analyze(
+        {"product_purchased": False}, {}
+    )
+    summary = result["report"]["case_summary"]
+    assert summary["product_purchased"] is False
+    assert summary["product_has_problem"] is None
+    assert summary["seller_contacted"] is None
+    assert summary["desired_resolution"] is None
+    assert all(item["available"] is None for item in result["report"]["evidence_checklist"])
