@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consumer Legal Expert System</title>
-    <meta name="description" content="Preliminary information for consumer issues involving defective products.">
+    <title>LegalAssist | Legal Expert System</title>
+    <meta name="description" content="Preliminary legal information and case guidance across consumer matters.">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <main id="auth-state" class="auth-shell">
         <section class="auth-panel">
-            <p class="auth-kicker">Consumer legal information</p>
+            <p class="auth-kicker">LEGAL INFORMATION</p>
             <h1>LegalAssist</h1>
             <p class="auth-subtitle">AI-Based Legal Expert System</p>
             <form id="login-form" class="auth-form">
@@ -42,15 +42,29 @@
             
             <button id="new-chat-btn" class="new-chat-btn"><span>+</span> New Case</button>
 
+            <nav class="sidebar-nav" aria-label="Main navigation">
+                <button type="button" data-screen="dashboard"><span aria-hidden="true">⌂</span> Dashboard</button>
+                <button id="my-cases-btn" type="button"><span aria-hidden="true">▤</span> My Cases</button>
+            </nav>
+
             <div class="chat-history">
-                <h3>Recent Cases</h3>
+                <h3>My Cases</h3>
                 <ul id="history-list">
                 </ul>
             </div>
 
+            <section class="legal-domains" aria-labelledby="legal-domains-title">
+                <h3 id="legal-domains-title">Legal Domains</h3>
+                <ul>
+                    <li><span>Consumer</span><span class="domain-status available">Available</span></li>
+                    <li><span>Rental</span><span class="domain-status">Coming Soon</span></li>
+                    <li><span>Cyber</span><span class="domain-status">Coming Soon</span></li>
+                    <li><span>Contract</span><span class="domain-status">Coming Soon</span></li>
+                </ul>
+            </section>
+
             <div class="sidebar-footer">
-                <a href="#" id="glossary-btn">Glossary / Search</a>
-                <a href="#" id="export-link" class="hidden">Export Case</a>
+                <a href="#" id="glossary-btn"><span aria-hidden="true">⌕</span> Glossary</a>
                 <div class="user-profile">
                     <div class="avatar" id="user-avatar">G</div>
                     <span id="user-name-display">Guest</span>
@@ -62,17 +76,15 @@
         <!-- MAIN CHAT AREA -->
         <main class="main-content">
             <header class="chat-header">
-                <h2>Consumer Legal Guidance</h2>
+                <h2>Legal Guidance</h2>
                 <p>Preliminary legal information based on verified facts</p>
-                <button id="export-btn" class="export-btn hidden">Export Case</button>
+                <button id="export-btn" class="export-btn hidden" type="button">Export Case</button>
             </header>
 
             <div class="chat-wrapper">
                 <div class="chat-container" id="chat-container">
                     <section id="dashboard-state" class="workflow-screen welcome-state hidden">
-                        <p class="auth-kicker">Workspace</p>
                         <h1 id="dashboard-greeting">Welcome</h1>
-                        <p>Your consumer cases</p>
                         <button id="dashboard-new-case" class="submit-questionnaire" type="button">+ New Case</button>
                         <h2>Recent Cases</h2>
                         <ul id="dashboard-cases" class="dashboard-cases"></ul>
@@ -87,8 +99,9 @@
                     </section>
 
                     <section id="interview-state" class="workflow-screen hidden">
-                        <p class="auth-kicker">Defective Product</p>
-                        <h1>Defective Product</h1>
+                        <p id="interview-module-label" class="auth-kicker">Defective Product</p>
+                        <h1 id="interview-module-title">Defective Product</h1>
+                        <p id="interview-introduction" class="module-introduction"></p>
                         <p id="question-progress" class="question-progress"></p>
                         <form id="questionnaire" class="questionnaire">
                             <div id="question-fields" class="question-fields"></div>
@@ -105,7 +118,9 @@
                         <form id="details-form" class="questionnaire">
                             <div class="detail-grid">
                                 <label>Product name<input name="product_name" autocomplete="off"></label>
+                                <label>Platform / website / app<input name="platform_name" autocomplete="url"></label>
                                 <label>Seller / business name<input name="seller_name" autocomplete="organization"></label>
+                                <label>Seller address<input name="seller_address" autocomplete="street-address"></label>
                                 <label>Purchase date<input name="purchase_date" type="date"></label>
                                 <label>Amount paid<input name="amount_paid" type="number" min="0" step="any" inputmode="decimal"></label>
                                 <label>Order / invoice number<input name="order_or_invoice_number" autocomplete="off"></label>
@@ -121,9 +136,12 @@
 
                     <section id="evidence-state" class="workflow-screen hidden">
                         <p class="auth-kicker">Defective Product</p>
-                        <h1>Evidence Report</h1>
+                        <h1>Evidence Checklist</h1>
                         <p>Evidence availability is based on your answers.</p>
+                        <h2 class="evidence-list-heading">Reported Available</h2>
                         <ul id="evidence-report-list" class="evidence-report-list"></ul>
+                        <h2 class="evidence-list-heading">Other Recommended Evidence</h2>
+                        <ul id="recommended-evidence-list" class="evidence-report-list"></ul>
                         <div class="question-navigation">
                             <button id="evidence-continue" class="submit-questionnaire" type="button">Continue to guidance</button>
                         </div>
@@ -136,14 +154,6 @@
                     </div>
                 </div>
 
-                <!-- Case Info Panel (Right Side) -->
-                <div class="case-panel hidden" id="case-panel">
-                    <h3>Case Summary</h3>
-                    <div id="case-summary-content"></div>
-                    
-                    <h3 class="mt-4">Evidence Checklist</h3>
-                    <div id="evidence-checklist"></div>
-                </div>
             </div>
 
             <div class="input-area hidden">
@@ -162,13 +172,35 @@
 
     <!-- Glossary Overlay -->
     <div id="glossary-overlay" class="overlay hidden">
-        <div class="glossary-modal">
-            <button id="close-glossary" class="close-btn">×</button>
-            <h2>Legal Glossary & Knowledge Search</h2>
-            <input type="text" id="glossary-search" placeholder="Search for 'Defect', 'Section 2(10)', etc.">
+        <section class="glossary-modal" role="dialog" aria-modal="true" aria-labelledby="glossary-title">
+            <div class="glossary-heading">
+                <div>
+                    <p class="auth-kicker">Legal reference</p>
+                    <h2 id="glossary-title">Glossary</h2>
+                </div>
+                <button id="close-glossary" class="close-btn" type="button" aria-label="Close glossary">×</button>
+            </div>
+            <div class="glossary-tabs" role="tablist" aria-label="Glossary domain">
+                <button type="button" role="tab" data-glossary-domain="consumer" aria-selected="true">Consumer</button>
+                <button type="button" role="tab" data-glossary-domain="rental" aria-selected="false">Rental</button>
+                <button type="button" role="tab" data-glossary-domain="cyber" aria-selected="false">Cyber</button>
+                <button type="button" role="tab" data-glossary-domain="contract" aria-selected="false">Contract</button>
+            </div>
+            <label class="glossary-search-label" for="glossary-search">Search terms and provisions</label>
+            <input type="search" id="glossary-search" placeholder="Search a term, section, or act">
             <div id="glossary-results"></div>
-        </div>
+        </section>
     </div>
+
+    <dialog id="delete-case-dialog" class="delete-case-dialog" aria-labelledby="delete-case-title">
+        <h2 id="delete-case-title">Delete this case?</h2>
+        <p>This will permanently remove the case and its associated case data.</p>
+        <p id="delete-case-error" class="delete-case-error" role="alert"></p>
+        <div class="delete-case-actions">
+            <button id="cancel-delete-case" type="button">Cancel</button>
+            <button id="confirm-delete-case" type="button">Delete Case</button>
+        </div>
+    </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/axios@1.7.2/dist/axios.min.js"></script>
     <script src="js/main.js"></script>
