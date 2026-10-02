@@ -1,4 +1,5 @@
 from io import BytesIO
+import os
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
@@ -7,6 +8,55 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+
+def _body_font():
+    candidates = [
+        os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts", "arial.ttf"),
+        os.path.join(os.path.dirname(__file__), "..", ".venv", "Lib", "site-packages", "reportlab", "fonts", "Vera.ttf"),
+    ]
+    for font_path in candidates:
+        if os.path.isfile(font_path):
+            try:
+                if "LegalAssistUnicode" not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont("LegalAssistUnicode", font_path))
+                return "LegalAssistUnicode"
+            except (OSError, ValueError):
+                continue
+    return "Helvetica"
+
+
+def _format_date(value):
+    if value in (None, ""):
+        return "Not provided"
+    try:
+        from datetime import date
+        parsed = date.fromisoformat(str(value)[:10])
+        return f"{parsed.day} {parsed.strftime('%B %Y')}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _format_amount(value):
+    if value in (None, ""):
+        return "Not provided"
+    try:
+        number = str(int(round(float(value))))
+        if len(number) <= 3:
+            grouped = number
+        else:
+            last_three = number[-3:]
+            prefix = number[:-3]
+            groups = []
+            while prefix:
+                groups.insert(0, prefix[-2:])
+                prefix = prefix[:-2]
+            grouped = f"{','.join(groups)},{last_three}"
+        return f"₹{grouped}"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _paragraph(value, style):
@@ -15,7 +65,7 @@ def _paragraph(value, style):
     return Paragraph(escape(str(value)).replace("\n", "<br/>"), style)
 
 
-def build_case_report_pdf(report, case_id, created_at, facts, timeline):
+def build_case_report_pdf(report, case_id, created_at, facts, timeline, case_title=None):
     """Render the existing case report as a readable, non-JSON PDF."""
     output = BytesIO()
     document = SimpleDocTemplate(
@@ -29,6 +79,7 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
         author="LegalAssist",
     )
     base = getSampleStyleSheet()
+    font_name = _body_font()
     title_style = ParagraphStyle(
         "LegalAssistTitle",
         parent=base["Title"],
@@ -47,6 +98,7 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
     body_style = ParagraphStyle(
         "ReportBody",
         parent=base["BodyText"],
+        fontName=font_name,
         leading=14,
         spaceAfter=2 * mm,
         wordWrap="CJK",
@@ -64,7 +116,8 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
 
     metadata = [
         ["Case ID", case_id or "Not provided"],
-        ["Case date", created_at or "Not provided"],
+        ["Case title", case_title or report.get("case_summary", {}).get("selected_issue", "Defective Product")],
+        ["Case date", _format_date(created_at)],
         ["Selected issue", report.get("case_summary", {}).get("selected_issue", "Defective Product")],
     ]
     metadata_table = Table(
@@ -91,8 +144,8 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
         ("Product has a problem", _yes_no(summary.get("product_has_problem"))),
         ("Product name", summary.get("product_name")),
         ("Seller/business name", summary.get("seller_name")),
-        ("Purchase date", summary.get("purchase_date")),
-        ("Amount paid", summary.get("amount_paid")),
+        ("Purchase date", _format_date(summary.get("purchase_date"))),
+        ("Amount paid", _format_amount(summary.get("amount_paid"))),
         ("Order/invoice number", summary.get("order_or_invoice_number")),
         ("Problem/situation", summary.get("problem_situation")),
         ("Seller contacted", _yes_no(summary.get("seller_contacted"))),
@@ -117,10 +170,16 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.append(summary_table)
+    for evidence_name, available in (summary.get("evidence_availability") or {}).items():
+        story.append(_paragraph(
+            f"{evidence_name}: {'Reported available' if available is True else 'Not reported'}",
+            body_style,
+        ))
 
     story.append(Paragraph("Answers / Facts", heading_style))
     for fact_key, value in facts.items():
-        story.append(_paragraph(f"{fact_key.replace('_', ' ').title()}: {_yes_no(value)}", body_style))
+        display_value = _yes_no(value) if isinstance(value, bool) or value is None else str(value)
+        story.append(_paragraph(f"{fact_key.replace('_', ' ').title()}: {display_value}", body_style))
 
     story.append(Paragraph("Possible Legal Issue", heading_style))
     story.append(_paragraph(report.get("possible_issue") or report.get("assessment"), body_style))
@@ -155,8 +214,11 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
     complaint = report.get("where_to_complain") or {}
     grievance = complaint.get("grievance_support") or {}
     if grievance:
+        contacts = ", ".join(
+            value for value in (grievance.get("phone"), grievance.get("alternate_phone")) if value
+        )
         story.append(_paragraph(
-            f"{grievance.get('name')}: {grievance.get('phone')}; {grievance.get('url')}. {grievance.get('description')}",
+            f"{grievance.get('name')}: {contacts}; {grievance.get('url')}. {grievance.get('description')}",
             body_style,
         ))
     formal = complaint.get("formal_complaint") or {}
@@ -165,7 +227,7 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
     pecuniary = complaint.get("pecuniary_jurisdiction") or {}
     if pecuniary.get("determined"):
         story.append(_paragraph(
-            f"Informational jurisdiction estimate: {pecuniary.get('authority')} based on consideration paid of INR {pecuniary.get('consideration_paid')}. {pecuniary.get('message')}",
+            f"Informational jurisdiction estimate: {pecuniary.get('authority')} based on consideration paid of {_format_amount(pecuniary.get('consideration_paid'))}. {pecuniary.get('message')}",
             body_style,
         ))
     else:
@@ -175,17 +237,91 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline):
         story.append(_paragraph(f"• {factor}", small_style))
 
     if timeline:
-        story.append(Paragraph("Case Timeline", heading_style))
+        story.append(Paragraph("Case Activity", heading_style))
         for item in timeline:
             detail = item.get("details", {})
             suffix = f" ({detail.get('fact')})" if detail.get("fact") else ""
-            story.append(_paragraph(f"{item.get('at', 'Date not recorded')} — {item.get('event', 'Case event')}{suffix}", small_style))
+            activity_date = _format_date(item.get("at"))
+            story.append(_paragraph(f"{activity_date} — {item.get('event', 'Case event')}{suffix}", small_style))
 
     story.extend([
         Spacer(1, 4 * mm),
+        Paragraph("Disclaimer", heading_style),
         _paragraph(report.get("disclaimer"), small_style),
     ])
     document.build(story)
+    return output.getvalue()
+
+
+def build_legal_document_pdf(document_title, draft_text, case_id):
+    """Render one explicitly requested legal-document draft for printing."""
+    output = BytesIO()
+    font_name = _body_font()
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "LegalDocumentTitle",
+        parent=styles["Title"],
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#193b53"),
+        spaceAfter=4 * mm,
+    )
+    meta_style = ParagraphStyle(
+        "LegalDocumentMeta",
+        parent=styles["BodyText"],
+        fontName=font_name,
+        alignment=TA_CENTER,
+        fontSize=9,
+        textColor=colors.HexColor("#586b77"),
+        spaceAfter=5 * mm,
+    )
+    heading_style = ParagraphStyle(
+        "LegalDocumentHeading",
+        parent=styles["Heading3"],
+        textColor=colors.HexColor("#236f6c"),
+        spaceBefore=3 * mm,
+        spaceAfter=1.5 * mm,
+        keepWithNext=True,
+    )
+    body_style = ParagraphStyle(
+        "LegalDocumentBody",
+        parent=styles["BodyText"],
+        leading=15,
+        spaceAfter=2.3 * mm,
+        wordWrap="CJK",
+    )
+    story = [
+        Paragraph("LegalAssist", title_style),
+        Paragraph(escape(document_title), styles["Heading1"]),
+        Paragraph(f"Case ID: {escape(case_id or 'Not provided')} · Draft for review", meta_style),
+    ]
+    for line in draft_text.splitlines():
+        normalized = line.strip()
+        if not normalized:
+            story.append(Spacer(1, 1.5 * mm))
+        elif normalized.isupper() and len(normalized) < 100:
+            story.append(Paragraph(escape(normalized), heading_style))
+        else:
+            story.append(Paragraph(escape(line).replace("\n", "<br/>"), body_style))
+
+    def footer(canvas, document):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#586b77"))
+        canvas.drawString(20 * mm, 11 * mm, "Preliminary draft for review; not proof of filing or acceptance.")
+        canvas.drawRightString(A4[0] - 20 * mm, 11 * mm, f"Page {document.page}")
+        canvas.restoreState()
+
+    document = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=20 * mm,
+        leftMargin=20 * mm,
+        topMargin=18 * mm,
+        bottomMargin=20 * mm,
+        title=document_title,
+        author="LegalAssist",
+    )
+    document.build(story, onFirstPage=footer, onLaterPages=footer)
     return output.getvalue()
 
 

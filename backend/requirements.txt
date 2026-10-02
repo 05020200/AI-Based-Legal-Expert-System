@@ -3,3 +3,4 @@ flask-cors==4.0.0
 mysql-connector-python==8.2.0
 python-dotenv==1.0.0
 reportlab==5.0.1
+pypdf==5.9.0

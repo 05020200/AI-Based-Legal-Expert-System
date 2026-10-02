@@ -212,11 +212,16 @@ class DefectiveProductService:
                 "consumer_complaint_route_available",
             ]
         guidance = LegalGuidanceService().get_guidance(guidance_conclusions)
+        legal_service = LegalGuidanceService()
         provisions = [
             provision
             for entry in guidance
             for provision in entry.get("applicable_law", [])
         ]
+        if issue_identified and "consumer_guidance_required" in conclusions:
+            section_39 = legal_service.get_provision_by_section("Section 39")
+            if section_39:
+                provisions.append(section_39)
         provision = next(
             (item for item in provisions if item.get("section_number") == "Section 2(10)"),
             None,
@@ -251,6 +256,7 @@ class DefectiveProductService:
             "product_has_problem": facts.get("product_has_problem"),
             "product_name": details.get("product_name"),
             "seller_name": details.get("seller_name"),
+            "seller_address": details.get("seller_address"),
             "purchase_date": details.get("purchase_date"),
             "amount_paid": details.get("amount_paid"),
             "order_or_invoice_number": details.get("order_or_invoice_number"),
@@ -275,9 +281,31 @@ class DefectiveProductService:
                 assessment = (
                     "Based on the information provided, this may indicate a possible consumer issue involving a defective product."
                 )
+            product = details.get("product_name") or "product"
+            seller = f" from {details['seller_name']}" if details.get("seller_name") else " from a seller or business"
             why_relevant = (
-                "You reported purchasing a product from a seller or business and that the product has a problem. "
-                "Those facts may be relevant to whether the goods have a defect under Section 2(10); this report does not decide that question."
+                f"You reported purchasing a {product}{seller} and that it has a problem: "
+                f"{details.get('problem_description') or 'no further problem description was provided'}. "
+            )
+            if facts.get("seller_contacted") is True:
+                if facts.get("seller_resolved") is False:
+                    why_relevant += (
+                        "You also reported contacting the seller and that the issue was not resolved. "
+                    )
+                else:
+                    why_relevant += "You reported contacting the seller about the issue. "
+            evidence_names = [
+                item["name"] for item in evidence_checklist if item["available"] is True
+            ]
+            if evidence_names:
+                why_relevant += (
+                    "You reported having " + ", ".join(evidence_names) + ". "
+                    "These materials may help document the facts of the dispute. "
+                )
+            why_relevant += (
+                "These facts may be relevant to whether the goods have a defect within the meaning of "
+                "Section 2(10) of the Consumer Protection Act, 2019. This report does not determine "
+                "whether a defect has been legally established or guarantee any particular remedy."
             )
             possible_options = [
                 "You may ask the seller about repair, replacement, or refund, depending on the circumstances and applicable law."
@@ -411,6 +439,7 @@ class DefectiveProductService:
             "grievance_support": {
                 "name": "National Consumer Helpline",
                 "phone": "1915",
+                "alternate_phone": "1800-11-4000",
                 "url": "https://consumerhelpline.gov.in/",
                 "description": "A consumer grievance-support channel; it is distinct from a formal Consumer Commission complaint.",
             },
@@ -428,6 +457,7 @@ class DefectiveProductService:
         allowed_text = {
             "product_name",
             "seller_name",
+            "seller_address",
             "purchase_date",
             "order_or_invoice_number",
             "problem_description",

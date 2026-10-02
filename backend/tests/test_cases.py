@@ -1,6 +1,8 @@
 import uuid
+from io import BytesIO
 
 import pytest
+from pypdf import PdfReader
 from werkzeug.security import generate_password_hash
 
 from backend.app import app
@@ -56,6 +58,7 @@ def test_guest_cases_save_reopen_and_isolate_facts(client):
         assert reopened_case["case_details"]["problem_description"] == detail_text
         assert reopened_case["current_question_key"] == "product_purchased"
         assert reopened_case["case_id"].startswith("CASE-2026-")
+        assert reopened_case["case_title"] == f"Defective Product — {reopened_case['case_id']}"
 
         isolated = client.get(f"/api/cases/{second_case['session_token']}")
         assert isolated.get_json()["case"]["answers"] == {}
@@ -117,10 +120,17 @@ def test_only_defective_product_module_is_available(client):
 
 def test_document_generation_requires_explicit_supported_action(monkeypatch, client):
     class FakeTemplateGenerationService:
-        def generate_defective_product_document(self, document_type, case_details):
-            assert document_type == "replacement_request"
+        _DOCUMENT_TITLES = {
+            "seller_complaint": "SELLER COMPLAINT",
+            "replacement_request": "REPLACEMENT REQUEST",
+            "refund_request": "REFUND REQUEST",
+            "consumer_commission_complaint": "CONSUMER COMMISSION COMPLAINT",
+        }
+
+        def generate_defective_product_document(self, document_type, case_details, consumer_details):
             assert case_details["product_name"] == "Test product"
-            return "Draft based on provided facts."
+            assert consumer_details["consumer_name"] == "Priya S"
+            return f"{self._DOCUMENT_TITLES[document_type]} draft for {consumer_details['consumer_name']}."
 
     monkeypatch.setattr(
         case_routes, "TemplateGenerationService", FakeTemplateGenerationService
@@ -137,18 +147,91 @@ def test_document_generation_requires_explicit_supported_action(monkeypatch, cli
         assert saved.status_code == 200
         unsupported = client.post(f"/api/cases/{token}/documents", json={
             "document_type": "arbitrary_document",
+            "consumer_details": {"consumer_name": "Priya S"},
         })
         assert unsupported.status_code == 400
-
-        generated = client.post(f"/api/cases/{token}/documents", json={
-            "document_type": "replacement_request",
+        missing_name = client.post(f"/api/cases/{token}/documents", json={
+            "document_type": "seller_complaint",
+            "consumer_details": {},
         })
-        assert generated.status_code == 200
-        assert generated.get_json()["draft"] == "Draft based on provided facts."
+        assert missing_name.status_code == 400
+
+        document_types = [
+            "seller_complaint",
+            "replacement_request",
+            "refund_request",
+            "consumer_commission_complaint",
+        ]
+        for document_type in document_types:
+            preview = client.post(f"/api/cases/{token}/documents", json={
+                "document_type": document_type,
+                "consumer_details": {"consumer_name": "Priya S"},
+            })
+            assert preview.status_code == 200
+            assert preview.get_json()["title"] == FakeTemplateGenerationService._DOCUMENT_TITLES[document_type]
+            assert document_type.upper().replace("_", " ") in preview.get_json()["preview"]
+
+            pdf_response = client.post(f"/api/cases/{token}/documents/pdf", json={
+                "document_type": document_type,
+                "consumer_details": {"consumer_name": "Priya S"},
+            })
+            assert pdf_response.status_code == 200
+            assert pdf_response.mimetype == "application/pdf"
+            assert pdf_response.data.startswith(b"%PDF")
+            pdf_text = "\n".join(
+                page.extract_text() or ""
+                for page in PdfReader(BytesIO(pdf_response.data)).pages
+            )
+            assert FakeTemplateGenerationService._DOCUMENT_TITLES[document_type] in pdf_text
+            assert "Priya S" in pdf_text
+
         reopened = client.get(f"/api/cases/{token}").get_json()["case"]
         assert reopened["timeline"][-1]["event"] == "Document generated"
+        assert reopened["status"] == "Document Ready"
     finally:
         cleanup_cases([token])
+
+
+def test_case_status_advances_only_at_workflow_milestones(client):
+    created = client.post("/api/cases")
+    token = created.get_json()["case"]["session_token"]
+    try:
+        assert created.get_json()["case"]["status"] == "In Progress"
+        guidance = client.put(f"/api/cases/{token}", json={
+            "module_id": "defective_product",
+            "answers": {"product_purchased": True, "product_has_problem": True},
+            "case_details": {"product_name": "Laptop"},
+            "report": {"assessment": "Possible issue"},
+        })
+        assert guidance.get_json()["case"]["status"] == "Guidance Ready"
+        assert guidance.get_json()["case"]["case_title"] == "Laptop — Defective Product"
+
+        reopened = client.get(f"/api/cases/{token}").get_json()["case"]
+        assert reopened["status"] == "Guidance Ready"
+
+        complete = client.put(f"/api/cases/{token}", json={"status": "Completed"})
+        assert complete.get_json()["case"]["status"] == "Completed"
+        activity_names = [event["event"] for event in complete.get_json()["case"]["timeline"]]
+        assert "Case completed" in activity_names
+        assert "Case saved" not in activity_names
+        assert "Question answered" not in activity_names
+    finally:
+        cleanup_cases([token])
+
+
+def test_legacy_completed_status_is_projected_from_actual_activity():
+    case = {"status": "Completed"}
+    state = {
+        "report": {"assessment": "Guidance ready"},
+        "timeline": [
+            {"event": "Guidance generated"},
+            {"event": "Document generated"},
+            {"event": "PDF exported"},
+        ],
+    }
+    assert case_routes._effective_status(case, state) == "Document Ready"
+    state["timeline"].append({"event": "Case completed"})
+    assert case_routes._effective_status(case, state) == "Completed"
 
 
 def test_pdf_export_returns_pdf_and_records_event(client):
@@ -189,6 +272,14 @@ def test_pdf_export_returns_pdf_and_records_event(client):
         assert response.mimetype == "application/pdf"
         assert response.data.startswith(b"%PDF")
         assert "CASE-2026-" in response.headers["Content-Disposition"]
+        pdf_text = "\n".join(
+            page.extract_text() or ""
+            for page in PdfReader(BytesIO(response.data)).pages
+        )
+        for section in ["LegalAssist", "Your Situation / Case Summary", "Possible Legal Issue", "Evidence", "What To Do Next", "Where To Complain", "Disclaimer"]:
+            assert section in pdf_text
+        assert "Product A" in pdf_text
+        assert not pdf_text.lstrip().startswith("{")
 
         reopened = client.get(f"/api/cases/{token}").get_json()["case"]
         assert reopened["timeline"][-1]["event"] == "PDF exported"

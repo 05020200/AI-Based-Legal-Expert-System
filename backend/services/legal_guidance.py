@@ -81,6 +81,13 @@ class LegalGuidanceService:
                 })
         return guidances
 
+    def get_provision_by_section(self, section_number: str) -> Dict[str, Any] | None:
+        """Return one configured provision without running inference."""
+        for provision in self._provisions:
+            if provision.get("section_number") == section_number:
+                return dict(provision)
+        return None
+
     # ---------------------------------------------------------------------
     # Helpers
     # ---------------------------------------------------------------------

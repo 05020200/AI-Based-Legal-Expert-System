@@ -29,6 +29,15 @@ _ANSWER_KEYS = {
     "problem_evidence_available",
     "seller_communication_available",
 }
+_PUBLIC_ACTIVITY = {
+    "Case created",
+    "Questions completed",
+    "Case details saved",
+    "Guidance generated",
+    "Document generated",
+    "PDF exported",
+    "Case completed",
+}
 
 
 @cases_bp.route("/api/modules", methods=["GET"])
@@ -73,6 +82,59 @@ def _case_label(case):
     return f"CASE-{year}-{case['case_id']:04d}"
 
 
+def _case_title(state, case_label):
+    module = next((item for item in _MODULES if item["id"] == state.get("module_id")), None)
+    issue = module["name"] if module else "New case"
+    product_name = state.get("case_details", {}).get("product_name")
+    if product_name:
+        return f"{product_name} — {issue}"
+    return f"{issue} — {case_label}"
+
+
+def _public_activity(events):
+    visible = []
+    seen = set()
+    for event in events:
+        name = event.get("event")
+        if name not in _PUBLIC_ACTIVITY:
+            continue
+        timestamp = event.get("at", "")
+        day = timestamp[:10]
+        key = (name, day)
+        if key in seen:
+            continue
+        seen.add(key)
+        visible.append(event)
+    return visible
+
+
+def _add_activity(state, event, details=None):
+    state.setdefault("timeline", [])
+    today = datetime.now(timezone.utc).date().isoformat()
+    if any(
+        item.get("event") == event and item.get("at", "")[:10] == today
+        for item in state["timeline"]
+    ):
+        return
+    state["timeline"].append(_timeline_event(event, details))
+
+
+def _effective_status(case, state):
+    status = case["status"]
+    events = state.get("timeline", [])
+    if status == "Completed" and not any(
+        event.get("event") == "Case completed" for event in events
+    ):
+        if state.get("generated_documents") or any(
+            event.get("event") == "Document generated" for event in events
+        ):
+            return "Document Ready"
+        if state.get("report"):
+            return "Guidance Ready"
+        return "In Progress"
+    return status
+
+
 def _read_case_state(cursor, case_id):
     cursor.execute(
         "SELECT fact_key, fact_value FROM case_facts WHERE case_id = %s",
@@ -104,12 +166,16 @@ def _read_case_state(cursor, case_id):
 
 def _case_response(case, state):
     created = case["created_at"]
+    case_label = _case_label(case)
+    response_state = dict(state)
+    response_state["timeline"] = _public_activity(state.get("timeline", []))
     return {
-        "case_id": _case_label(case),
+        "case_id": case_label,
+        "case_title": _case_title(state, case_label),
         "session_token": case["session_token"],
         "created_at": created.isoformat() if hasattr(created, "isoformat") else str(created),
-        "status": case["status"],
-        **state,
+        "status": _effective_status(case, state),
+        **response_state,
     }
 
 
@@ -156,11 +222,13 @@ def get_cases():
         for case in cases:
             state = _read_case_state(cursor, case["case_id"])
             module = next((item for item in _MODULES if item["id"] == state["module_id"]), None)
+            case_label = _case_label(case)
             result.append({
-                "case_id": _case_label(case),
+                "case_id": case_label,
+                "case_title": _case_title(state, case_label),
                 "session_token": case["session_token"],
                 "issue": module["name"] if module else "Not selected",
-                "status": case["status"],
+                "status": _effective_status(case, state),
                 "created_at": case["created_at"].isoformat()
                 if hasattr(case["created_at"], "isoformat") else str(case["created_at"]),
             })
@@ -242,7 +310,7 @@ def update_case(session_token):
         return jsonify({"error": "Answers must be an object."}), 400
     if "case_details" in data and not isinstance(data["case_details"], dict):
         return jsonify({"error": "Case details must be an object."}), 400
-    if data.get("status") not in (None, "In Progress", "Completed"):
+    if data.get("status") not in (None, "Completed"):
         return jsonify({"error": "Invalid case status."}), 400
 
     conn = get_db_connection()
@@ -254,28 +322,42 @@ def update_case(session_token):
         if not case:
             return jsonify({"error": "Case not found."}), 404
         state = _read_case_state(cursor, case["case_id"])
-        previous_answers = dict(state["answers"])
+        previous_case_details = dict(state["case_details"])
+        previous_question_key = state.get("current_question_key")
         previous_report = state.get("report")
+        previous_status = _effective_status(case, state)
         for key in ("module_id", "answers", "case_details", "current_question_key", "report"):
             if key in data:
                 state[key] = data[key]
         if set(state["answers"]) - _ANSWER_KEYS:
             return jsonify({"error": "The case contains an unsupported answer."}), 400
 
-        for key, value in state["answers"].items():
-            if previous_answers.get(key) != value:
-                state["timeline"].append(_timeline_event("Question answered", {"fact": key}))
+        if data.get("current_question_key") == "analysis" and previous_question_key != "analysis":
+            _add_activity(state, "Questions completed")
+        if state["case_details"] != previous_case_details and data.get("current_question_key") == "analysis":
+            _add_activity(state, "Case details saved")
         if not previous_report and state.get("report"):
-            state["timeline"].append(_timeline_event("Guidance generated"))
-        state["timeline"].append(_timeline_event("Case saved"))
+            _add_activity(state, "Guidance generated")
+        if data.get("status") == "Completed" and case["status"] != "Completed":
+            _add_activity(state, "Case completed")
 
         _persist_case_state(cursor, case["case_id"], state)
-        if data.get("status"):
-            cursor.execute(
-                "UPDATE cases SET status = %s WHERE case_id = %s",
-                (data["status"], case["case_id"]),
-            )
-            case["status"] = data["status"]
+        if data.get("status") == "Completed":
+            case["status"] = "Completed"
+        elif previous_status == "Completed":
+            case["status"] = "Completed"
+        elif state.get("generated_documents") or any(
+            event.get("event") == "Document generated" for event in state.get("timeline", [])
+        ):
+            case["status"] = "Document Ready"
+        elif state.get("report"):
+            case["status"] = "Guidance Ready"
+        else:
+            case["status"] = "In Progress"
+        cursor.execute(
+            "UPDATE cases SET status = %s WHERE case_id = %s",
+            (case["status"], case["case_id"]),
+        )
         conn.commit()
         return jsonify({"success": True, "case": _case_response(case, state)}), 200
     except Exception:
@@ -287,11 +369,27 @@ def update_case(session_token):
 
 
 @cases_bp.route("/api/cases/<session_token>/documents", methods=["POST"])
-def generate_case_document(session_token):
+def preview_case_document(session_token):
     data = request.get_json(silent=True) or {}
     document_type = data.get("document_type")
-    if document_type not in {"seller_complaint", "replacement_request", "refund_request"}:
+    consumer_details = data.get("consumer_details")
+    if document_type not in {
+        "seller_complaint",
+        "replacement_request",
+        "refund_request",
+        "consumer_commission_complaint",
+    }:
         return jsonify({"error": "Choose a supported document type."}), 400
+    if not isinstance(consumer_details, dict):
+        return jsonify({"error": "Enter consumer details to continue."}), 400
+    consumer_details = {
+        key: str(consumer_details.get(key, "")).strip()
+        for key in ("consumer_name", "consumer_address", "consumer_phone", "consumer_email", "document_date")
+    }
+    if not consumer_details["consumer_name"]:
+        return jsonify({"error": "Consumer name is required."}), 400
+    if any(len(value) > 500 for value in consumer_details.values()):
+        return jsonify({"error": "Consumer details must be 500 characters or fewer."}), 400
 
     conn = get_db_connection()
     if not conn:
@@ -306,20 +404,101 @@ def generate_case_document(session_token):
             return jsonify({"error": "Complete the Defective Product analysis first."}), 409
 
         document_data = dict(state["case_details"])
-        document_data["desired_resolution"] = state["answers"].get("desired_resolution")
+        document_data.update({
+            "case_id": _case_label(case),
+            "answers": state["answers"],
+            "report": state["report"],
+            "desired_resolution": state["answers"].get("desired_resolution"),
+            "selected_resolution": state["answers"].get("desired_resolution"),
+        })
         draft = TemplateGenerationService().generate_defective_product_document(
-            document_type, document_data
+            document_type, document_data, consumer_details
         )
-        state["timeline"].append(_timeline_event("Document generated", {"document_type": document_type}))
-        _persist_case_state(cursor, case["case_id"], state)
-        conn.commit()
-        return jsonify({"success": True, "document_type": document_type, "draft": draft}), 200
+        title = TemplateGenerationService._DOCUMENT_TITLES[document_type]
+        return jsonify({"success": True, "document_type": document_type, "title": title, "preview": draft}), 200
     except ValueError as error:
         conn.rollback()
         return jsonify({"error": str(error)}), 400
     except Exception:
         conn.rollback()
         return jsonify({"error": "Unable to generate this document."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@cases_bp.route("/api/cases/<session_token>/documents/pdf", methods=["POST"])
+def generate_case_document_pdf(session_token):
+    data = request.get_json(silent=True) or {}
+    document_type = data.get("document_type")
+    consumer_details = data.get("consumer_details")
+    if document_type not in {
+        "seller_complaint",
+        "replacement_request",
+        "refund_request",
+        "consumer_commission_complaint",
+    } or not isinstance(consumer_details, dict):
+        return jsonify({"error": "Choose a document type and provide consumer details."}), 400
+    consumer_details = {
+        key: str(consumer_details.get(key, "")).strip()
+        for key in ("consumer_name", "consumer_address", "consumer_phone", "consumer_email", "document_date")
+    }
+    if not consumer_details["consumer_name"]:
+        return jsonify({"error": "Consumer name is required."}), 400
+    if any(len(value) > 500 for value in consumer_details.values()):
+        return jsonify({"error": "Consumer details must be 500 characters or fewer."}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed."}), 500
+    cursor = conn.cursor(dictionary=True)
+    try:
+        from services.pdf_export import build_legal_document_pdf
+
+        case = _case_access(cursor, session_token)
+        if not case:
+            return jsonify({"error": "Case not found."}), 404
+        state = _read_case_state(cursor, case["case_id"])
+        if state.get("module_id") != "defective_product" or not state.get("report"):
+            return jsonify({"error": "Complete the Defective Product analysis first."}), 409
+        document_data = dict(state["case_details"])
+        document_data.update({
+            "case_id": _case_label(case),
+            "answers": state["answers"],
+            "report": state["report"],
+            "desired_resolution": state["answers"].get("desired_resolution"),
+            "selected_resolution": state["answers"].get("desired_resolution"),
+        })
+        draft = TemplateGenerationService().generate_defective_product_document(
+            document_type, document_data, consumer_details
+        )
+        title = TemplateGenerationService._DOCUMENT_TITLES[document_type]
+        pdf_bytes = build_legal_document_pdf(title, draft, _case_label(case))
+        state.setdefault("generated_documents", []).append({
+            "document_type": document_type,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        _add_activity(state, "Document generated", {"document_type": document_type})
+        if _effective_status(case, state) != "Completed":
+            case["status"] = "Document Ready"
+            cursor.execute(
+                "UPDATE cases SET status = %s WHERE case_id = %s",
+                (case["status"], case["case_id"]),
+            )
+        _persist_case_state(cursor, case["case_id"], state)
+        conn.commit()
+        return send_file(
+            BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{_case_label(case)}-{document_type}.pdf",
+        )
+    except ValueError as error:
+        conn.rollback()
+        return jsonify({"error": str(error)}), 400
+    except Exception:
+        conn.rollback()
+        return jsonify({"error": "Unable to generate this document PDF."}), 500
     finally:
         cursor.close()
         conn.close()
@@ -347,9 +526,16 @@ def export_case_pdf(session_token):
             _case_label(case),
             case["created_at"].isoformat() if hasattr(case["created_at"], "isoformat") else str(case["created_at"]),
             state["answers"],
-            state["timeline"],
+            _public_activity(state["timeline"]),
+            _case_title(state, _case_label(case)),
         )
         _persist_case_state(cursor, case["case_id"], state)
+        if _effective_status(case, state) != "Completed":
+            case["status"] = _effective_status(case, state)
+            cursor.execute(
+                "UPDATE cases SET status = %s WHERE case_id = %s",
+                (case["status"], case["case_id"]),
+            )
         conn.commit()
         return send_file(
             BytesIO(pdf_bytes),

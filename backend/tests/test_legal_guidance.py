@@ -49,6 +49,14 @@ def test_consumer_complaint_route_available(service):
     assert law["title"] == "Manner in which complaint shall be made"
 
 
+def test_consumer_protection_section_39_is_available(service):
+    provision = service.get_provision_by_section("Section 39")
+    assert provision is not None
+    assert provision["act_name"] == "Consumer Protection Act, 2019"
+    assert provision["title"] == "Findings of District Commission"
+    assert "does not establish" in provision["applicability"]
+
+
 def test_unknown_conclusion(service):
     result = service.get_guidance(["some_unknown_fact"])
     assert len(result) == 1

@@ -196,6 +196,7 @@ def test_report_uses_section_210_limited_evidence_and_preserves_case_details():
     assert {item["section_number"] for item in report["legal_provisions"]} == {
         "Section 2(10)",
         "Section 35",
+        "Section 39",
     }
     assert report["where_to_complain"]["pecuniary_jurisdiction"]["determined"] is True
     assert report["where_to_complain"]["pecuniary_jurisdiction"]["jurisdiction_level"] == "District"
