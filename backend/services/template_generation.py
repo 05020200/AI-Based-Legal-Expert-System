@@ -66,6 +66,10 @@ class TemplateGenerationService:
     }
     _DOCUMENT_TITLES = {
         "seller_complaint": "SELLER COMPLAINT",
+        "service_provider_complaint": "SERVICE PROVIDER COMPLAINT",
+        "refund_compensation_request": "REFUND / COMPENSATION REQUEST",
+        "business_complaint": "BUSINESS COMPLAINT",
+        "refund_correction_request": "REFUND / CORRECTION REQUEST",
         "warranty_complaint": "WARRANTY COMPLAINT",
         "replacement_request": "REPLACEMENT REQUEST",
         "refund_request": "REFUND REQUEST",

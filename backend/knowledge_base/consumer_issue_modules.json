@@ -170,5 +170,111 @@
     "resolved_next_steps": ["Keep the order confirmation, payment and delivery records, seller/platform communication, and resolution confirmation."],
     "unresolved_next_steps": ["Keep the order confirmation, payment and delivery records, and all seller/platform communications together.","If the issue remains unresolved, consider contacting the platform through its recorded support channel and keeping the reference number.","Review available grievance routes and current formal complaint instructions if the matter is not resolved."],
     "general_next_steps": ["Keep your order, payment, and delivery records.","If the order issue is still pending, check its status with the seller or platform and keep the response."]
+  },
+  "service_deficiency": {
+    "name": "Deficiency in Service",
+    "description": "A purchased service may not have been provided as agreed or with due care.",
+    "title_detail_key": "service_type",
+    "issue_conclusion": "deficient_service_issue",
+    "unresolved_conclusion": "unresolved_service_issue",
+    "resolved_fact": "issue_resolved",
+    "why_relevant": "A reported problem with a purchased service may be relevant to the service performance required by the applicable terms.",
+    "questions": [
+      {"key":"service_purchased","prompt":"Did you purchase the service from a provider or business?","type":"boolean","required":true},
+      {"key":"service_type","prompt":"What service did you purchase?","type":"text","required":true,"visible_when":[{"fact_key":"service_purchased","equals":"true"}]},
+      {"key":"service_provider","prompt":"Who provided the service?","type":"text","required":false,"visible_when":[{"fact_key":"service_purchased","equals":"true"}]},
+      {"key":"service_date","prompt":"When was the service due or provided?","type":"text","required":false,"visible_when":[{"fact_key":"service_purchased","equals":"true"}]},
+      {"key":"amount_paid","prompt":"How much did you pay, if known?","type":"text","required":false,"visible_when":[{"fact_key":"service_purchased","equals":"true"}]},
+      {"key":"service_problem_exists","prompt":"Did a problem occur with the service?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_purchased","equals":"true"}]},
+      {"key":"problem_description","prompt":"Briefly describe the service problem.","type":"text","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"service_not_provided","prompt":"Was the service not provided?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"service_delayed","prompt":"Was the service delayed?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"service_inadequate","prompt":"Was the service inadequate or incomplete?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"service_not_as_agreed","prompt":"Was the service different from what was agreed?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"provider_contacted","prompt":"Have you contacted the service provider about the problem?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"provider_response","prompt":"What response did the provider give?","type":"text","required":false,"visible_when":[{"fact_key":"provider_contacted","equals":"true"}]},
+      {"key":"issue_resolved","prompt":"Has the service issue been resolved?","type":"boolean","required":true,"visible_when":[{"fact_key":"provider_contacted","equals":"true"}]},
+      {"key":"desired_resolution","prompt":"What outcome are you seeking?","type":"choice","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}],"options":["Service provided or completed","Refund","Compensation","Not sure"]},
+      {"key":"purchase_proof_available","prompt":"Is an invoice or payment proof available?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_purchased","equals":"true"}]},
+      {"key":"service_evidence_available","prompt":"Are records or other evidence of the service problem available?","type":"boolean","required":true,"visible_when":[{"fact_key":"service_problem_exists","equals":"true"}]},
+      {"key":"communication_available","prompt":"Is communication with the provider available?","type":"boolean","required":true,"visible_when":[{"fact_key":"provider_contacted","equals":"true"}]}
+    ],
+    "rules": [
+      {"rule_id":"SV1","rule_name":"Identify a reported deficiency in a purchased service","conditions":[{"fact_key":"service_purchased","expected_value":"true"},{"fact_key":"service_problem_exists","expected_value":"true"}],"conclusion":"deficient_service_issue","explanation":"The consumer reports purchasing a service and a problem with that service."},
+      {"rule_id":"SV2","rule_name":"Identify an unresolved service issue","conditions":[{"fact_key":"deficient_service_issue","expected_value":"true"},{"fact_key":"provider_contacted","expected_value":"true"},{"fact_key":"issue_resolved","expected_value":"false"}],"conclusion":"unresolved_service_issue","explanation":"The provider was contacted and the reported service issue remains unresolved."},
+      {"rule_id":"SV3","rule_name":"Identify a consumer guidance need","conditions":[{"fact_key":"unresolved_service_issue","expected_value":"true"}],"conclusion":"consumer_guidance_required","explanation":"The reported service issue remains unresolved after contacting the provider."},
+      {"rule_id":"SV4","rule_name":"Identify a complaint route for an unresolved service issue","conditions":[{"fact_key":"unresolved_service_issue","expected_value":"true"}],"conclusion":"consumer_complaint_route_available","explanation":"Complaint-route information may be relevant to the unresolved service issue."}
+    ],
+    "evidence": [
+      {"fact_key":"purchase_proof_available","name":"Invoice / Payment Proof"},
+      {"fact_key":"service_evidence_available","name":"Service Records"},
+      {"fact_key":"communication_available","name":"Communication with Provider"}
+    ],
+    "recommended_evidence": ["Service Agreement / Terms","Invoice / Payment Proof","Service Request Number","Service Records","Appointment / Booking Confirmation","Communication with Provider","Photos / Videos of the Service Issue","Previous Complaint / Grievance Number"],
+    "documents": [
+      {"type":"service_provider_complaint","label":"Prepare Service Provider Complaint"},
+      {"type":"refund_compensation_request","label":"Prepare Refund / Compensation Request"},
+      {"type":"consumer_commission_complaint","label":"Prepare Consumer Commission Complaint"}
+    ],
+    "resolved_options": ["You reported that the service issue was resolved; keep the confirmation and service records."],
+    "unresolved_options": ["You may seek the requested service completion, refund, or compensation, subject to the service terms and circumstances."],
+    "general_options": ["The answers do not currently establish both a purchased service and a reported service problem."],
+    "resolved_next_steps": ["Keep the service terms, payment proof, provider communications, and records showing how the issue was resolved."],
+    "unresolved_next_steps": ["Keep the service terms, booking/payment proof, service records, and provider communications together.","If unresolved, consider the National Consumer Helpline (1915) or the applicable Consumer Commission procedure."],
+    "general_next_steps": ["Keep any service terms and payment records. If a service problem occurs, record what happened and contact the provider in writing."]
+  },
+  "unfair_trade_practice": {
+    "name": "Misleading Advertisement / Unfair Trade Practice",
+    "description": "An advertisement or business claim may be false, misleading, or omit important information.",
+    "title_detail_key": "advertiser_or_business",
+    "issue_conclusion": "potential_unfair_trade_practice",
+    "unresolved_conclusion": "unresolved_advertisement_issue",
+    "resolved_fact": "issue_resolved",
+    "why_relevant": "A reported advertisement claim and actual experience may be relevant to consumer protections against unfair trade practices.",
+    "questions": [
+      {"key":"advertisement_seen","prompt":"Did you see an advertisement or business claim about a product or service?","type":"boolean","required":true},
+      {"key":"advertisement_source","prompt":"Where did you see it?","type":"text","required":false,"visible_when":[{"fact_key":"advertisement_seen","equals":"true"}]},
+      {"key":"advertiser_or_business","prompt":"Which business or advertiser made the claim?","type":"text","required":false,"visible_when":[{"fact_key":"advertisement_seen","equals":"true"}]},
+      {"key":"product_or_service","prompt":"What product or service was advertised?","type":"text","required":false,"visible_when":[{"fact_key":"advertisement_seen","equals":"true"}]},
+      {"key":"claim_made","prompt":"Did the advertisement make a specific claim?","type":"boolean","required":true,"visible_when":[{"fact_key":"advertisement_seen","equals":"true"}]},
+      {"key":"claim_description","prompt":"What claim was made?","type":"text","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"actual_experience","prompt":"What did you actually experience?","type":"text","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"claim_false_or_misleading","prompt":"Do you believe the claim was false or misleading based on your experience?","type":"boolean","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"important_information_hidden","prompt":"Was important information omitted or hidden?","type":"boolean","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"price_or_discount_claim","prompt":"Was a price or discount claim involved?","type":"boolean","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"product_or_service_received","prompt":"Did you purchase or receive the product or service?","type":"boolean","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"difference_from_advertisement","prompt":"How did what you received differ from the advertisement?","type":"text","required":false,"visible_when":[{"fact_key":"product_or_service_received","equals":"true"}]},
+      {"key":"business_contacted","prompt":"Have you contacted the business about the claim?","type":"boolean","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}]},
+      {"key":"business_response","prompt":"What response did the business give?","type":"text","required":false,"visible_when":[{"fact_key":"business_contacted","equals":"true"}]},
+      {"key":"issue_resolved","prompt":"Has the issue been resolved?","type":"boolean","required":true,"visible_when":[{"fact_key":"business_contacted","equals":"true"}]},
+      {"key":"desired_resolution","prompt":"What outcome are you seeking?","type":"choice","required":true,"visible_when":[{"fact_key":"claim_made","equals":"true"}],"options":["Correction / Clarification","Refund","Compensation","Not sure"]},
+      {"key":"advertisement_evidence_available","prompt":"Is a copy, screenshot, image, or recording of the advertisement available?","type":"boolean","required":true,"visible_when":[{"fact_key":"advertisement_seen","equals":"true"}]},
+      {"key":"purchase_proof_available","prompt":"Is purchase proof available?","type":"boolean","required":true,"visible_when":[{"fact_key":"product_or_service_received","equals":"true"}]},
+      {"key":"communication_available","prompt":"Is communication with the business available?","type":"boolean","required":true,"visible_when":[{"fact_key":"business_contacted","equals":"true"}]}
+    ],
+    "rules": [
+      {"rule_id":"UT1","rule_name":"Identify a reported misleading advertisement concern","conditions":[{"fact_key":"advertisement_seen","expected_value":"true"},{"fact_key":"claim_made","expected_value":"true"},{"fact_key":"claim_false_or_misleading","expected_value":"true"}],"conclusion":"potential_unfair_trade_practice","explanation":"The consumer reports seeing an advertisement, a specific claim, and facts they believe make the claim false or misleading."},
+      {"rule_id":"UT2","rule_name":"Identify a reported omission concern","conditions":[{"fact_key":"advertisement_seen","expected_value":"true"},{"fact_key":"claim_made","expected_value":"true"},{"fact_key":"important_information_hidden","expected_value":"true"}],"conclusion":"potential_unfair_trade_practice","explanation":"The consumer reports seeing a specific claim and that important information was omitted or hidden."},
+      {"rule_id":"UT3","rule_name":"Identify an unresolved advertisement concern","conditions":[{"fact_key":"potential_unfair_trade_practice","expected_value":"true"},{"fact_key":"business_contacted","expected_value":"true"},{"fact_key":"issue_resolved","expected_value":"false"}],"conclusion":"unresolved_advertisement_issue","explanation":"The business was contacted and the reported advertisement issue remains unresolved."},
+      {"rule_id":"UT4","rule_name":"Identify a consumer guidance need","conditions":[{"fact_key":"unresolved_advertisement_issue","expected_value":"true"}],"conclusion":"consumer_guidance_required","explanation":"The reported advertisement issue remains unresolved after contacting the business."},
+      {"rule_id":"UT5","rule_name":"Identify a complaint route for an unresolved advertisement issue","conditions":[{"fact_key":"unresolved_advertisement_issue","expected_value":"true"}],"conclusion":"consumer_complaint_route_available","explanation":"Complaint-route information may be relevant to the unresolved advertisement issue."}
+    ],
+    "evidence": [
+      {"fact_key":"advertisement_evidence_available","name":"Advertisement Screenshot / Video / Image"},
+      {"fact_key":"purchase_proof_available","name":"Invoice / Purchase Proof"},
+      {"fact_key":"communication_available","name":"Communication with Business"}
+    ],
+    "recommended_evidence": ["Advertisement Screenshot","Advertisement Video / Image","Product Listing","Offer / Discount Details","Terms and Conditions","Invoice / Purchase Proof","Product Packaging / Label","Communication with Business","Previous Complaint / Grievance Number"],
+    "documents": [
+      {"type":"business_complaint","label":"Prepare Business Complaint"},
+      {"type":"refund_correction_request","label":"Prepare Refund / Correction Request"},
+      {"type":"consumer_commission_complaint","label":"Prepare Consumer Commission Complaint"}
+    ],
+    "resolved_options": ["You reported that the business resolved the issue; keep the correction, refund, or other resolution confirmation."],
+    "unresolved_options": ["You may ask the business to clarify or correct the claim and consider the requested refund or compensation, depending on the facts and applicable terms."],
+    "general_options": ["The answers do not establish both a specific advertisement claim and a reported false, misleading, or omitted-information concern."],
+    "resolved_next_steps": ["Keep the advertisement, business communications, and confirmation of the reported resolution."],
+    "unresolved_next_steps": ["Keep a copy of the advertisement, the actual product/service details, and business communications.","If unresolved, consider the National Consumer Helpline (1915) or the applicable Consumer Commission procedure."],
+    "general_next_steps": ["Keep a copy of the advertisement and note what was claimed and what you experienced. Contact the business if clarification is needed."]
   }
 }

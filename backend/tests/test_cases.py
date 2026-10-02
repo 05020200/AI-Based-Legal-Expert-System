@@ -137,7 +137,7 @@ def test_guest_can_delete_only_their_case_and_cascade_case_data(client):
         cleanup_cases(tokens)
 
 
-def test_first_four_consumer_modules_are_available(client):
+def test_all_six_consumer_modules_are_available(client):
     response = client.get("/api/modules")
     modules = response.get_json()["modules"]
     assert response.status_code == 200
@@ -147,6 +147,8 @@ def test_first_four_consumer_modules_are_available(client):
         "refund_replacement",
         "warranty",
         "ecommerce",
+        "service_deficiency",
+        "unfair_trade_practice",
     ]
 
 
@@ -180,6 +182,42 @@ def test_new_module_case_answers_save_reopen_and_remain_isolated(client):
     finally:
         cleanup_cases([token])
 
+@pytest.mark.parametrize(("module_id", "answers", "case_details", "expected_title"), [
+    (
+        "service_deficiency",
+        {"service_purchased": True, "service_type": "Home cleaning"},
+        {},
+        "Home cleaning — Deficiency in Service",
+    ),
+    (
+        "unfair_trade_practice",
+        {"advertisement_seen": True, "advertiser_or_business": "BrightHome"},
+        {},
+        "BrightHome — Misleading Advertisement / Unfair Trade Practice",
+    ),
+])
+def test_phase5_phase6_cases_save_reopen_and_isolate(
+    client, module_id, answers, case_details, expected_title
+):
+    first = client.post("/api/cases").get_json()["case"]
+    second = client.post("/api/cases").get_json()["case"]
+    tokens = [first["session_token"], second["session_token"]]
+    try:
+        saved = client.put(f"/api/cases/{tokens[0]}", json={
+            "module_id": module_id,
+            "answers": answers,
+            "case_details": case_details,
+            "current_question_key": next(iter(answers)),
+        })
+        assert saved.status_code == 200
+        reopened = client.get(f"/api/cases/{tokens[0]}").get_json()["case"]
+        assert reopened["module_id"] == module_id
+        assert reopened["answers"] == answers
+        assert reopened["case_title"] == expected_title
+        assert client.get(f"/api/cases/{tokens[1]}").get_json()["case"]["answers"] == {}
+    finally:
+        cleanup_cases(tokens)
+
 
 @pytest.mark.parametrize(("module_id", "document_type", "answers", "case_details"), [
     (
@@ -199,6 +237,18 @@ def test_new_module_case_answers_save_reopen_and_remain_isolated(client):
         "consumer_commission_complaint",
         {"online_purchase": True, "platform_name": "Example Market", "order_placed": True},
         {"platform_name": "Example Market", "order_or_invoice_number": "ORD-52"},
+    ),
+    (
+        "service_deficiency",
+        "service_provider_complaint",
+        {"service_purchased": True, "service_type": "Home cleaning", "service_problem_exists": True},
+        {"service_provider": "CleanCo", "service_date": "2026-09-20"},
+    ),
+    (
+        "unfair_trade_practice",
+        "business_complaint",
+        {"advertisement_seen": True, "claim_made": True, "claim_description": "Same-day service"},
+        {"advertiser_or_business": "BrightHome", "advertisement_source": "Website"},
     ),
 ])
 def test_new_module_document_preview_and_pdf(client, module_id, document_type, answers, case_details):

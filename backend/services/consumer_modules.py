@@ -293,6 +293,26 @@ class ConsumerModuleService:
                 "issue_resolved": answers.get("issue_resolved"),
                 "desired_resolution": answers.get("desired_resolution"),
             }
+        elif module_id in {"service_deficiency", "unfair_trade_practice"}:
+            available_evidence_names = {
+                evidence["name"]
+                for evidence in definition["evidence"]
+                if facts.get(evidence["fact_key"]) is True
+            }
+            situation_builder = (
+                cls._service_situation
+                if module_id == "service_deficiency"
+                else cls._advertisement_situation
+            )
+            summary = {
+                "selected_issue": definition["name"],
+                "situation_text": situation_builder(answers),
+                **{
+                    question["key"]: answers[question["key"]]
+                    for question in questions
+                    if question["key"] in answers
+                },
+            }
 
         if issue_identified and resolved:
             assessment = "You reported that the issue has been resolved. This report does not determine whether any further action is appropriate."
@@ -348,6 +368,46 @@ class ConsumerModuleService:
                 assessment = (
                     "Based on the information provided, this may indicate an online-order issue involving "
                     f"{problem}; the answers do not establish that it remains unresolved."
+                )
+
+        if module_id == "service_deficiency":
+            if issue_identified and resolved:
+                assessment = (
+                    "You reported that the service issue was resolved. This preliminary report does not determine "
+                    "whether the service legally amounted to a deficiency."
+                )
+            elif issue_identified and unresolved:
+                assessment = (
+                    "Based on the information provided, this may indicate an unresolved consumer issue "
+                    "concerning the reported service performance."
+                )
+            elif issue_identified:
+                assessment = (
+                    "Based on the information provided, this may indicate a possible deficiency in the purchased service."
+                )
+            else:
+                assessment = (
+                    "The answers do not establish both a purchased service and a reported service problem."
+                )
+
+        if module_id == "unfair_trade_practice":
+            if issue_identified and resolved:
+                assessment = (
+                    "You reported that the advertisement issue was resolved. This does not determine whether the claim "
+                    "legally amounted to an unfair trade practice."
+                )
+            elif issue_identified and unresolved:
+                assessment = (
+                    "Based on the information provided, this may raise a consumer issue concerning a potentially "
+                    "misleading advertisement or unfair trade practice."
+                )
+            elif issue_identified:
+                assessment = (
+                    "Based on the information provided, this may raise a consumer issue concerning the reported advertisement claim."
+                )
+            else:
+                assessment = (
+                    "The answers do not establish a specific false or misleading claim or important omitted information."
                 )
 
         if resolved:
@@ -412,6 +472,42 @@ class ConsumerModuleService:
                 ]
                 next_steps = cls._ecommerce_next_steps(answers)
 
+        if module_id == "service_deficiency" and issue_identified:
+            if resolved:
+                possible_options = [
+                    "You reported that the service issue was resolved; retain the confirmation and related records."
+                ]
+                next_steps = cls._service_next_steps(answers, resolved=True)
+            elif unresolved:
+                resolution = (answers.get("desired_resolution") or "an appropriate resolution").lower()
+                possible_options = [
+                    f"You may pursue the requested {resolution}, subject to the service terms and circumstances."
+                ]
+                next_steps = cls._service_next_steps(answers)
+            else:
+                possible_options = [
+                    "Consider contacting the provider in writing to request the stated outcome and keep a copy."
+                ]
+                next_steps = cls._service_next_steps(answers, contact_first=True)
+
+        if module_id == "unfair_trade_practice" and issue_identified:
+            if resolved:
+                possible_options = [
+                    "You reported that the business resolved the issue; retain the correction, refund, or other resolution confirmation."
+                ]
+                next_steps = cls._advertisement_next_steps(answers, resolved=True)
+            elif unresolved:
+                resolution = (answers.get("desired_resolution") or "an appropriate resolution").lower()
+                possible_options = [
+                    f"You may ask the business to consider the requested {resolution}, depending on the facts and applicable terms."
+                ]
+                next_steps = cls._advertisement_next_steps(answers)
+            else:
+                possible_options = [
+                    "Consider asking the business to clarify or correct the claim; this report does not determine that it was legally misleading."
+                ]
+                next_steps = cls._advertisement_next_steps(answers, contact_first=True)
+
         details_for_explanation = details.get("problem_description") or summary.get("problem_situation")
         why_relevant = definition["why_relevant"]
         if details_for_explanation:
@@ -470,9 +566,39 @@ class ConsumerModuleService:
             if unresolved:
                 why_relevant += " Section 35 describes a consumer complaint route."
 
+        if module_id == "service_deficiency" and issue_identified:
+            reported_problems = [
+                label for key, label in (
+                    ("service_not_provided", "not provided"),
+                    ("service_delayed", "delayed"),
+                    ("service_inadequate", "inadequate or incomplete"),
+                    ("service_not_as_agreed", "not as agreed"),
+                ) if answers.get(key) is True
+            ]
+            problem_text = ", ".join(reported_problems) or answers.get("problem_description", "")
+            why_relevant = (
+                f"You reported that the service was {problem_text}. Section 2(11) addresses a fault, shortcoming, "
+                "or inadequacy in service performance required by law, contract, or otherwise; applying it depends on the facts."
+            )
+
+        if module_id == "unfair_trade_practice" and issue_identified:
+            why_relevant = (
+                "You reported a specific advertisement claim and that it was false or misleading, or that important information was hidden. "
+                "Section 2(47) addresses unfair or deceptive trade practices; this report does not determine whether the legal test is met."
+            )
+            if answers.get("claim_description"):
+                why_relevant = (
+                    f"You reported the claim '{answers['claim_description']}' and that it was false or misleading, "
+                    "or that important information was hidden. Section 2(47) addresses unfair or deceptive trade practices; "
+                    "this report does not determine whether the legal test is met."
+                )
+
         if unresolved:
+            amount_for_jurisdiction = details.get("amount_paid")
+            if module_id == "service_deficiency":
+                amount_for_jurisdiction = answers.get("amount_paid") or amount_for_jurisdiction
             complaint_information = DefectiveProductService._complaint_information(
-                details.get("amount_paid"), complaint_provision
+                amount_for_jurisdiction, complaint_provision
             )
         else:
             complaint_information = None
@@ -538,6 +664,37 @@ class ConsumerModuleService:
             recommended_evidence = [
                 name for name in definition["recommended_evidence"]
                 if name not in available_evidence_names
+            ]
+        elif module_id in {"service_deficiency", "unfair_trade_practice"}:
+            relevant_section = "Section 2(11)" if module_id == "service_deficiency" else "Section 2(47)"
+            relevant_sections = {relevant_section}
+            if unresolved:
+                relevant_sections.add("Section 35")
+            legal_provisions = [
+                {
+                    **provision,
+                    "description": provision.get("description")
+                    or provision.get("plain_language_description"),
+                }
+                for provision in provisions
+                if provision.get("section_number") in relevant_sections
+            ] if issue_identified else []
+            if unresolved and not any(
+                provision.get("section_number") == "Section 35"
+                for provision in legal_provisions
+            ):
+                section_35 = LegalGuidanceService().get_provision_by_section("Section 35")
+                if section_35:
+                    legal_provisions.append({
+                        **section_35,
+                        "description": section_35.get("plain_language_description"),
+                    })
+            available_for_filter = set(available_evidence_names)
+            if module_id == "unfair_trade_practice" and "Advertisement Screenshot / Video / Image" in available_for_filter:
+                available_for_filter.update({"Advertisement Screenshot", "Advertisement Video / Image"})
+            recommended_evidence = [
+                name for name in definition["recommended_evidence"]
+                if name not in available_for_filter
             ]
         report = {
             "title": f"{definition['name']} Legal Guidance Report",
@@ -755,5 +912,135 @@ class ConsumerModuleService:
         if answers.get("issue_resolved") is False:
             steps.append(
                 "If the issue remains unresolved, consider the National Consumer Helpline (1915) or the applicable Consumer Commission procedure."
+            )
+        return steps
+
+    @staticmethod
+    def _service_situation(answers: Dict[str, Any]) -> str:
+        service = answers.get("service_type") or "service"
+        provider = answers.get("service_provider")
+        if answers.get("service_purchased") is True:
+            situation = f"You purchased {service}"
+            if provider:
+                situation += f" from {provider}"
+            situation += "."
+        else:
+            return "You reported that you did not purchase the service from a provider or business."
+
+        if answers.get("service_problem_exists") is True:
+            categories = [
+                label for key, label in (
+                    ("service_not_provided", "not provided"),
+                    ("service_delayed", "delayed"),
+                    ("service_inadequate", "inadequate or incomplete"),
+                    ("service_not_as_agreed", "not as agreed"),
+                ) if answers.get(key) is True
+            ]
+            description = answers.get("problem_description")
+            if description:
+                situation += f" You reported: {description}."
+            elif categories:
+                situation += f" You reported that the service was {', '.join(categories)}."
+            if answers.get("provider_contacted") is True:
+                if answers.get("issue_resolved") is True:
+                    situation += " You contacted the provider and reported that the issue was resolved."
+                elif answers.get("issue_resolved") is False:
+                    situation += " The issue remains unresolved after contacting the provider."
+            elif answers.get("provider_contacted") is False:
+                situation += " You have not yet contacted the provider."
+            resolution = answers.get("desired_resolution")
+            if resolution and resolution != "Not sure":
+                situation += f" You are seeking {resolution.lower()}."
+        return situation
+
+    @staticmethod
+    def _advertisement_situation(answers: Dict[str, Any]) -> str:
+        if answers.get("advertisement_seen") is not True:
+            return "You reported that you have not seen an advertisement or business claim."
+        business = answers.get("advertiser_or_business")
+        product = answers.get("product_or_service")
+        situation = "You saw an advertisement"
+        if answers.get("advertisement_source"):
+            situation += f" at {answers['advertisement_source']}"
+        if business:
+            situation += f" from {business}"
+        if product:
+            situation += f" about {product}"
+        situation += "."
+
+        claim = answers.get("claim_description")
+        if claim:
+            situation += f" The claim was: {claim}."
+        actual = answers.get("actual_experience")
+        if actual:
+            situation += f" Your reported experience: {actual}."
+        if answers.get("claim_false_or_misleading") is True:
+            situation += " You believe the claim was false or misleading."
+        if answers.get("important_information_hidden") is True:
+            situation += " You reported that important information was hidden."
+        if answers.get("difference_from_advertisement"):
+            situation += f" Difference reported: {answers['difference_from_advertisement']}."
+        if answers.get("business_contacted") is True:
+            if answers.get("issue_resolved") is True:
+                situation += " You contacted the business and reported that the issue was resolved."
+            elif answers.get("issue_resolved") is False:
+                situation += " The issue remains unresolved after contacting the business."
+        elif answers.get("business_contacted") is False:
+            situation += " You have not yet contacted the business."
+        resolution = answers.get("desired_resolution")
+        if resolution and resolution != "Not sure":
+            situation += f" You are seeking {resolution.lower()}."
+        return situation
+
+    @staticmethod
+    def _service_next_steps(
+        answers: Dict[str, Any], resolved: bool = False, contact_first: bool = False
+    ) -> List[str]:
+        steps = []
+        steps.append(
+            "Keep the invoice and payment proof."
+            if answers.get("purchase_proof_available") is True
+            else "Locate the invoice, payment proof, or booking confirmation."
+        )
+        if answers.get("service_evidence_available") is True:
+            steps.append("Keep the service records and other evidence of the problem.")
+        else:
+            steps.append("Keep any service records, appointment details, or evidence of the problem.")
+        if answers.get("communication_available") is True:
+            steps.append("Keep communications with the provider and any service request number.")
+        elif answers.get("provider_contacted") is True:
+            steps.append("Ask the provider to confirm its response in writing and keep the reference number.")
+        if contact_first:
+            steps.append("Contact the provider in writing with the problem and requested outcome, and keep a copy.")
+        if not resolved and answers.get("issue_resolved") is False:
+            steps.append(
+                "If unresolved, consider the National Consumer Helpline (1915) or the applicable Consumer Commission procedure."
+            )
+        return steps
+
+    @staticmethod
+    def _advertisement_next_steps(
+        answers: Dict[str, Any], resolved: bool = False, contact_first: bool = False
+    ) -> List[str]:
+        steps = []
+        if answers.get("advertisement_evidence_available") is True:
+            steps.append("Keep the advertisement screenshot, image, or recording and its source/date.")
+        else:
+            steps.append("Save a copy or screenshot of the advertisement, including its source and date, if available.")
+        if answers.get("product_or_service_received") is True:
+            steps.append(
+                "Keep the invoice and details of the product or service received."
+                if answers.get("purchase_proof_available") is True
+                else "Keep details of what you received and locate any purchase proof."
+            )
+        if answers.get("communication_available") is True:
+            steps.append("Keep communications with the business and any complaint reference number.")
+        elif answers.get("business_contacted") is True:
+            steps.append("Ask the business to respond in writing and keep its response.")
+        if contact_first:
+            steps.append("Ask the business in writing to clarify or correct the claim and keep a copy.")
+        if not resolved and answers.get("issue_resolved") is False:
+            steps.append(
+                "If unresolved, consider the National Consumer Helpline (1915) or the applicable Consumer Commission procedure."
             )
         return steps

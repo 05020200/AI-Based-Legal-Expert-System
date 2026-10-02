@@ -17,8 +17,8 @@ _MODULES = [
     {"id": "refund_replacement", "name": "Refund / Replacement Issue", "description": "A seller has not provided a requested refund or replacement.", "available": True},
     {"id": "warranty", "name": "Warranty Issue", "description": "A product problem has arisen and requested warranty service may not have been provided.", "available": True},
     {"id": "ecommerce", "name": "E-Commerce Consumer Issue", "description": "A problem occurred with an order placed through an online platform, website, or app.", "available": True},
-    {"id": "service_deficiency", "name": "Deficiency in Service", "description": "A service was not provided properly or as expected.", "available": False},
-    {"id": "unfair_trade_practice", "name": "Misleading Advertisement / Unfair Trade Practice", "description": "An advertisement or business practice may be misleading or unfair.", "available": False},
+    {"id": "service_deficiency", "name": "Deficiency in Service", "description": "A service was not provided properly or as expected.", "available": True},
+    {"id": "unfair_trade_practice", "name": "Misleading Advertisement / Unfair Trade Practice", "description": "An advertisement or business practice may be misleading or unfair.", "available": True},
 ]
 _MODULE_BY_ID = {module["id"]: module for module in _MODULES}
 _ANSWER_KEYS = {

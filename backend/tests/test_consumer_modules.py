@@ -22,7 +22,8 @@ def service(monkeypatch):
 
 def test_module_definitions_and_conditional_question_flow(service):
     assert service.available_module_ids() == {
-        "refund_replacement", "warranty", "ecommerce"
+        "refund_replacement", "warranty", "ecommerce",
+        "service_deficiency", "unfair_trade_practice",
     }
 
     purchase_only = service.get_visible_questions(
@@ -45,6 +46,16 @@ def test_module_definitions_and_conditional_question_flow(service):
     assert [question["key"] for question in no_order] == [
         "online_purchase", "platform_name", "order_placed"
     ]
+
+    service_purchase = service.get_visible_questions(
+        "service_deficiency", {"service_purchased": True}
+    )
+    assert "service_problem_exists" in [question["key"] for question in service_purchase]
+
+    no_advertisement = service.get_visible_questions(
+        "unfair_trade_practice", {"advertisement_seen": False}
+    )
+    assert [question["key"] for question in no_advertisement] == ["advertisement_seen"]
 
 
 def test_module_facts_are_registered_in_the_shared_fact_catalog(service):
@@ -264,6 +275,118 @@ def test_ecommerce_problem_categories_derive_distinct_facts_and_rules(
     assert ConsumerModuleService._ecommerce_problem_label(problem_type) in result["report"]["case_summary"]["situation_text"]
 
 
+def test_service_deficiency_report_evidence_and_resolution(service):
+    answers = {
+        "service_purchased": True,
+        "service_type": "Home cleaning",
+        "service_provider": "CleanCo",
+        "service_date": "2026-09-20",
+        "amount_paid": "1500",
+        "service_problem_exists": True,
+        "problem_description": "Cleaner did not arrive",
+        "service_not_provided": True,
+        "service_delayed": False,
+        "service_inadequate": False,
+        "service_not_as_agreed": False,
+        "provider_contacted": True,
+        "provider_response": "No response",
+        "issue_resolved": False,
+        "desired_resolution": "Refund",
+        "purchase_proof_available": True,
+        "service_evidence_available": True,
+        "communication_available": True,
+    }
+    result = service.analyze("service_deficiency", answers, {})
+    report = result["report"]
+    assert result["rules_fired"] == ["SV1", "SV2", "SV3", "SV4"]
+    assert result["backward_result"]["goal_satisfied"] is True
+    assert "Cleaner did not arrive" in report["case_summary"]["situation_text"]
+    assert "unresolved consumer issue" in report["possible_issue"]
+    assert "Section 2(11)" in {item["section_number"] for item in report["legal_provisions"]}
+    assert "Section 35" in {item["section_number"] for item in report["legal_provisions"]}
+    assert [item["available"] for item in report["evidence_checklist"]] == [True, True, True]
+    assert len(report["recommended_evidence"]) == 5
+    assert not set(report["recommended_evidence"]) & {
+        item["name"] for item in report["evidence_checklist"] if item["available"] is True
+    }
+    assert "requested refund" in report["possible_options"][0]
+    assert any("National Consumer Helpline" in item for item in report["next_steps"])
+
+    resolved_answers = dict(answers)
+    resolved_answers["issue_resolved"] = True
+    resolved = service.analyze("service_deficiency", resolved_answers, {})["report"]
+    assert "was resolved" in resolved["possible_issue"]
+    assert resolved["where_to_complain"] is None
+    assert not any("Consumer Commission" in item for item in resolved["next_steps"])
+
+    no_problem = dict(answers)
+    no_problem["service_problem_exists"] = False
+    for key in (
+        "problem_description", "service_not_provided", "service_delayed",
+        "service_inadequate", "service_not_as_agreed", "provider_contacted",
+        "provider_response", "issue_resolved", "desired_resolution",
+        "service_evidence_available", "communication_available",
+    ):
+        no_problem.pop(key)
+    no_problem_result = service.analyze("service_deficiency", no_problem, {})
+    assert "deficient_service_issue" not in no_problem_result["facts"]
+    assert no_problem_result["report"]["legal_provisions"] == []
+
+
+def test_unfair_trade_practice_report_requires_supported_claim_facts(service):
+    answers = {
+        "advertisement_seen": True,
+        "advertisement_source": "Website",
+        "advertiser_or_business": "BrightHome",
+        "product_or_service": "Cleaning service",
+        "claim_made": True,
+        "claim_description": "Same-day service guaranteed",
+        "actual_experience": "No appointment was provided",
+        "claim_false_or_misleading": True,
+        "important_information_hidden": False,
+        "price_or_discount_claim": False,
+        "product_or_service_received": True,
+        "difference_from_advertisement": "No service was provided",
+        "business_contacted": True,
+        "business_response": "We are reviewing this",
+        "issue_resolved": False,
+        "desired_resolution": "Refund",
+        "advertisement_evidence_available": True,
+        "purchase_proof_available": True,
+        "communication_available": True,
+    }
+    result = service.analyze("unfair_trade_practice", answers, {})
+    report = result["report"]
+    assert result["rules_fired"] == ["UT1", "UT3", "UT4", "UT5"]
+    assert result["backward_result"]["goal_satisfied"] is True
+    assert "Same-day service guaranteed" in report["case_summary"]["situation_text"]
+    assert "may raise a consumer issue" in report["possible_issue"]
+    assert "Section 2(47)" in {item["section_number"] for item in report["legal_provisions"]}
+    assert "Section 35" in {item["section_number"] for item in report["legal_provisions"]}
+    assert [item["available"] for item in report["evidence_checklist"]] == [True, True, True]
+    assert len(report["recommended_evidence"]) == 5
+    assert not set(report["recommended_evidence"]) & {
+        item["name"] for item in report["evidence_checklist"] if item["available"] is True
+    }
+    assert "requested refund" in report["possible_options"][0]
+
+    resolved_answers = dict(answers)
+    resolved_answers["issue_resolved"] = True
+    resolved = service.analyze("unfair_trade_practice", resolved_answers, {})["report"]
+    assert "issue was resolved" in resolved["possible_issue"]
+    assert resolved["where_to_complain"] is None
+    assert not any("Consumer Commission" in item for item in resolved["next_steps"])
+
+    disagreement_only = dict(answers)
+    disagreement_only["claim_false_or_misleading"] = False
+    cautious = service.analyze("unfair_trade_practice", disagreement_only, {})
+    assert "potential_unfair_trade_practice" not in cautious["facts"]
+    hidden_information = dict(disagreement_only)
+    hidden_information["important_information_hidden"] = True
+    hidden = service.analyze("unfair_trade_practice", hidden_information, {})
+    assert "UT2" in hidden["rules_fired"]
+
+
 def test_module_analysis_rejects_hidden_or_missing_required_answers(service):
     with pytest.raises(ValueError, match="Please answer"):
         service.analyze("warranty", {"product_purchased": True}, {})
@@ -277,6 +400,13 @@ def test_module_analysis_rejects_hidden_or_missing_required_answers(service):
 
 def test_module_question_and_analysis_api_uses_shared_reasoning():
     client = app.test_client()
+    service_questions = client.get("/api/modules/service_deficiency/questions")
+    assert service_questions.status_code == 200
+    assert len(service_questions.get_json()["questions"]) == 18
+    advertisement_questions = client.get("/api/modules/unfair_trade_practice/questions")
+    assert advertisement_questions.status_code == 200
+    assert len(advertisement_questions.get_json()["questions"]) == 19
+
     questions = client.get("/api/modules/warranty/questions")
     assert questions.status_code == 200
     assert len(questions.get_json()["questions"]) == 13
@@ -315,4 +445,47 @@ def test_module_question_and_analysis_api_uses_shared_reasoning():
     assert payload["rules_fired"] == ["EC1", "EC2", "EC4", "EC6", "EC7"]
     assert payload["reasoning_trace"]
     assert payload["backward_result"]["goal_satisfied"] is True
-    assert client.get("/api/modules/service_deficiency/questions").status_code == 404
+
+    service_analysis = client.post("/api/modules/service_deficiency/analyze", json={
+        "answers": {
+            "service_purchased": True,
+            "service_type": "Home cleaning",
+            "service_problem_exists": True,
+            "problem_description": "Cleaner did not arrive",
+            "service_not_provided": True,
+            "service_delayed": False,
+            "service_inadequate": False,
+            "service_not_as_agreed": False,
+            "provider_contacted": True,
+            "issue_resolved": False,
+            "desired_resolution": "Refund",
+            "purchase_proof_available": True,
+            "service_evidence_available": False,
+            "communication_available": True,
+        },
+    })
+    assert service_analysis.status_code == 200
+    assert service_analysis.get_json()["rules_fired"] == ["SV1", "SV2", "SV3", "SV4"]
+    assert service_analysis.get_json()["reasoning_trace"]
+
+    advertisement_analysis = client.post("/api/modules/unfair_trade_practice/analyze", json={
+        "answers": {
+            "advertisement_seen": True,
+            "claim_made": True,
+            "claim_description": "Same-day service guaranteed",
+            "actual_experience": "No appointment was provided",
+            "claim_false_or_misleading": True,
+            "important_information_hidden": False,
+            "price_or_discount_claim": False,
+            "product_or_service_received": True,
+            "business_contacted": True,
+            "issue_resolved": False,
+            "desired_resolution": "Refund",
+            "advertisement_evidence_available": True,
+            "purchase_proof_available": True,
+            "communication_available": False,
+        },
+    })
+    assert advertisement_analysis.status_code == 200
+    assert advertisement_analysis.get_json()["rules_fired"] == ["UT1", "UT3", "UT4", "UT5"]
+    assert advertisement_analysis.get_json()["reasoning_trace"]
