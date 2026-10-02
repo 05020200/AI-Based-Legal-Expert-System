@@ -26,6 +26,45 @@ class TemplateGenerationService:
         "e‑commerce consumer issue": "Consumer Protection Act, 2019 — Section 2(8)",
     }
 
+    _DEFECTIVE_PRODUCT_DOCUMENTS = {
+        "seller_complaint": (
+            "Subject: Complaint about a product problem\n\n"
+            "To: {seller_name}\n\n"
+            "I purchased {product_name} on {purchase_date}. The amount paid was {amount_paid}. "
+            "The order or invoice number is {order_number}.\n\n"
+            "Problem reported: {problem}\n"
+            "Previous seller contact and response: {seller_response}\n\n"
+            "I request that you review this issue and consider the following resolution: {resolution}. "
+            "Please respond through the appropriate customer-support channel.\n\n"
+            "This draft reflects only the information entered and should be reviewed before sending.\n"
+            "Consumer name: [Consumer Name Not Provided]\n"
+            "Contact details: [Contact Details Not Provided]\n"
+            "Date: [Date Not Provided]"
+        ),
+        "replacement_request": (
+            "Subject: Request to consider replacement of a product\n\n"
+            "To: {seller_name}\n\n"
+            "I purchased {product_name} on {purchase_date}; amount paid: {amount_paid}; "
+            "order or invoice number: {order_number}.\n\n"
+            "The product problem reported is: {problem}.\n"
+            "Previous seller contact and response: {seller_response}.\n\n"
+            "I request that you consider a replacement, subject to the circumstances and applicable terms.\n\n"
+            "Consumer name: [Consumer Name Not Provided]\n"
+            "Date: [Date Not Provided]"
+        ),
+        "refund_request": (
+            "Subject: Request to consider refund for a product problem\n\n"
+            "To: {seller_name}\n\n"
+            "I purchased {product_name} on {purchase_date}; amount paid: {amount_paid}; "
+            "order or invoice number: {order_number}.\n\n"
+            "The product problem reported is: {problem}.\n"
+            "Previous seller contact and response: {seller_response}.\n\n"
+            "I request that you review the issue and consider a refund, subject to the circumstances and applicable terms.\n\n"
+            "Consumer name: [Consumer Name Not Provided]\n"
+            "Date: [Date Not Provided]"
+        ),
+    }
+
     def __init__(self) -> None:
         self._conn = get_db_connection()
         if not self._conn:
@@ -137,3 +176,29 @@ class TemplateGenerationService:
         )
         # Fill placeholders with provided data where possible.
         return self._fill_placeholders(legal_ref_line + template, data, placeholders)
+
+    def generate_defective_product_document(
+        self, document_type: str, case_details: Dict[str, Any]
+    ) -> str:
+        """Generate an explicitly requested defective-product draft."""
+        template = self._DEFECTIVE_PRODUCT_DOCUMENTS.get(document_type)
+        if template is None:
+            raise ValueError("Unsupported defective-product document type.")
+
+        amount = case_details.get("amount_paid")
+        if amount in (None, ""):
+            amount_text = "[Amount Paid Not Provided]"
+        else:
+            amount_text = f"INR {float(amount):,.2f}"
+
+        values = {
+            "seller_name": case_details.get("seller_name") or "[Seller/Business Name Not Provided]",
+            "product_name": case_details.get("product_name") or "[Product Name Not Provided]",
+            "purchase_date": case_details.get("purchase_date") or "[Purchase Date Not Provided]",
+            "amount_paid": amount_text,
+            "order_number": case_details.get("order_or_invoice_number") or "[Order/Invoice Number Not Provided]",
+            "problem": case_details.get("problem_description") or "[Product Problem Not Provided]",
+            "seller_response": case_details.get("seller_response") or "[Seller Response Not Provided]",
+            "resolution": case_details.get("desired_resolution") or "[Desired Resolution Not Provided]",
+        }
+        return template.format(**values)

@@ -5,6 +5,7 @@ from werkzeug.security import generate_password_hash
 
 from backend.app import app
 from backend.database.db import get_db_connection
+import routes.cases as case_routes
 
 
 @pytest.fixture
@@ -112,3 +113,84 @@ def test_only_defective_product_module_is_available(client):
     assert [module["id"] for module in modules if module["available"]] == [
         "defective_product"
     ]
+
+
+def test_document_generation_requires_explicit_supported_action(monkeypatch, client):
+    class FakeTemplateGenerationService:
+        def generate_defective_product_document(self, document_type, case_details):
+            assert document_type == "replacement_request"
+            assert case_details["product_name"] == "Test product"
+            return "Draft based on provided facts."
+
+    monkeypatch.setattr(
+        case_routes, "TemplateGenerationService", FakeTemplateGenerationService
+    )
+    created = client.post("/api/cases")
+    token = created.get_json()["case"]["session_token"]
+    try:
+        saved = client.put(f"/api/cases/{token}", json={
+            "module_id": "defective_product",
+            "answers": {"product_purchased": True, "product_has_problem": True},
+            "case_details": {"product_name": "Test product"},
+            "report": {"assessment": "Possible issue"},
+        })
+        assert saved.status_code == 200
+        unsupported = client.post(f"/api/cases/{token}/documents", json={
+            "document_type": "arbitrary_document",
+        })
+        assert unsupported.status_code == 400
+
+        generated = client.post(f"/api/cases/{token}/documents", json={
+            "document_type": "replacement_request",
+        })
+        assert generated.status_code == 200
+        assert generated.get_json()["draft"] == "Draft based on provided facts."
+        reopened = client.get(f"/api/cases/{token}").get_json()["case"]
+        assert reopened["timeline"][-1]["event"] == "Document generated"
+    finally:
+        cleanup_cases([token])
+
+
+def test_pdf_export_returns_pdf_and_records_event(client):
+    pytest.importorskip("reportlab")
+    created = client.post("/api/cases")
+    token = created.get_json()["case"]["session_token"]
+    try:
+        saved = client.put(f"/api/cases/{token}", json={
+            "module_id": "defective_product",
+            "answers": {"product_purchased": True, "product_has_problem": True},
+            "case_details": {"product_name": "Product A"},
+            "report": {
+                "title": "Defective Product Legal Guidance Report",
+                "possible_issue": "This may be a consumer issue.",
+                "assessment": "This may be a consumer issue.",
+                "why_relevant": "A product problem was reported.",
+                "case_summary": {
+                    "selected_issue": "Defective Product",
+                    "product_purchased": True,
+                    "product_has_problem": True,
+                    "product_name": "Product A",
+                    "seller_response_resolution": {},
+                    "evidence_availability": {},
+                },
+                "legal_provisions": [],
+                "legal_provision": None,
+                "evidence_checklist": [],
+                "possible_options": ["Consider asking the seller about repair."],
+                "next_steps": ["Keep relevant records."],
+                "where_to_complain": {},
+                "disclaimer": "Preliminary legal information only.",
+            },
+        })
+        assert saved.status_code == 200
+
+        response = client.get(f"/api/cases/{token}/pdf")
+        assert response.status_code == 200
+        assert response.mimetype == "application/pdf"
+        assert response.data.startswith(b"%PDF")
+        assert "CASE-2026-" in response.headers["Content-Disposition"]
+
+        reopened = client.get(f"/api/cases/{token}").get_json()["case"]
+        assert reopened["timeline"][-1]["event"] == "PDF exported"
+    finally:
+        cleanup_cases([token])

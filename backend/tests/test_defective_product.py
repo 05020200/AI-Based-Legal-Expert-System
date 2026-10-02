@@ -193,6 +193,12 @@ def test_report_uses_section_210_limited_evidence_and_preserves_case_details():
     report = result["report"]
     assert report["assessment"].startswith("Based on the information provided")
     assert report["legal_provision"]["section_number"] == "Section 2(10)"
+    assert {item["section_number"] for item in report["legal_provisions"]} == {
+        "Section 2(10)",
+        "Section 35",
+    }
+    assert report["where_to_complain"]["pecuniary_jurisdiction"]["determined"] is True
+    assert report["where_to_complain"]["pecuniary_jurisdiction"]["jurisdiction_level"] == "District"
     assert [item["name"] for item in report["evidence_checklist"]] == [
         "Purchase Invoice / Receipt",
         "Photographs / Videos of the Defect",
@@ -208,6 +214,10 @@ def test_report_uses_section_210_limited_evidence_and_preserves_case_details():
     assert report["case_summary"]["problem_situation"] == "Screen flickers"
     assert report["case_summary"]["seller_response_resolution"]["response_details"] == "Asked me to wait"
     assert report["case_summary"]["desired_resolution"] == "Repair"
+    assert result["internal"]["initial_facts"]["product_purchased"] == "true"
+    assert len(result["internal"]["derived_facts"]) == 3
+    assert len(result["internal"]["rules_fired"]) == 3
+    assert len(result["internal"]["reasoning_trace"]) == 3
 
 
 def test_api_questions_and_report_keep_guest_flow_without_internal_reasoning(client):
@@ -250,3 +260,29 @@ def test_conditional_analysis_preserves_unanswered_fields_as_unprovided(monkeypa
     assert summary["seller_contacted"] is None
     assert summary["desired_resolution"] is None
     assert all(item["available"] is None for item in result["report"]["evidence_checklist"])
+
+
+def test_missing_amount_does_not_guess_complaint_commission(monkeypatch):
+    class NoLookupAuthorityService:
+        _JURISDICTION_SOURCE = {"source": "Configured 2021 jurisdiction rules"}
+
+        def get_territorial_jurisdiction_info(self):
+            return {"territorial_jurisdiction": ["territorial factor"]}
+
+        def get_authority_information(self, amount):
+            raise AssertionError("No authority lookup should run without an amount.")
+
+    monkeypatch.setattr(
+        defective_product,
+        "AuthorityInfoService",
+        NoLookupAuthorityService,
+    )
+    monkeypatch.setattr(
+        defective_product,
+        "DocumentRecommendationService",
+        FakeDocumentRecommendationService,
+    )
+    report = DefectiveProductService.analyze(complete_answers(), {})["report"]
+    jurisdiction = report["where_to_complain"]["pecuniary_jurisdiction"]
+    assert jurisdiction["determined"] is False
+    assert "Amount paid was not provided" in jurisdiction["message"]

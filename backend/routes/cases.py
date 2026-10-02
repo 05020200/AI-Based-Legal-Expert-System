@@ -1,9 +1,12 @@
 import json
 import uuid
+from datetime import datetime, timezone
+from io import BytesIO
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, send_file, session
 
 from database.db import get_db_connection
+from services.template_generation import TemplateGenerationService
 
 
 cases_bp = Blueprint("cases", __name__)
@@ -35,6 +38,14 @@ def get_modules():
 
 def _guest_tokens():
     return session.get("guest_case_tokens", [])
+
+
+def _timeline_event(event, details=None):
+    return {
+        "event": event,
+        "at": datetime.now(timezone.utc).isoformat(),
+        "details": details or {},
+    }
 
 
 def _case_access(cursor, session_token):
@@ -73,6 +84,7 @@ def _read_case_state(cursor, case_id):
         "case_details": {},
         "current_question_key": None,
         "report": None,
+        "timeline": [],
     }
     for row in cursor.fetchall():
         if row["fact_key"] == _CASE_STATE_KEY:
@@ -99,6 +111,19 @@ def _case_response(case, state):
         "status": case["status"],
         **state,
     }
+
+
+def _persist_case_state(cursor, case_id, state):
+    cursor.execute("DELETE FROM case_facts WHERE case_id = %s", (case_id,))
+    fact_rows = [
+        (case_id, key, str(value).lower() if isinstance(value, bool) else str(value))
+        for key, value in state["answers"].items()
+    ]
+    fact_rows.append((case_id, _CASE_STATE_KEY, json.dumps(state)))
+    cursor.executemany(
+        "INSERT INTO case_facts (case_id, fact_key, fact_value) VALUES (%s, %s, %s)",
+        fact_rows,
+    )
 
 
 @cases_bp.route("/api/cases", methods=["GET"])
@@ -161,7 +186,14 @@ def create_case():
             (session.get("user_id"), token, "In Progress"),
         )
         case_pk = cursor.lastrowid
-        state = {"module_id": None, "answers": {}, "case_details": {}, "current_question_key": None, "report": None}
+        state = {
+            "module_id": None,
+            "answers": {},
+            "case_details": {},
+            "current_question_key": None,
+            "report": None,
+            "timeline": [_timeline_event("Case created")],
+        }
         cursor.execute(
             "INSERT INTO case_facts (case_id, fact_key, fact_value) VALUES (%s, %s, %s)",
             (case_pk, _CASE_STATE_KEY, json.dumps(state)),
@@ -222,22 +254,22 @@ def update_case(session_token):
         if not case:
             return jsonify({"error": "Case not found."}), 404
         state = _read_case_state(cursor, case["case_id"])
+        previous_answers = dict(state["answers"])
+        previous_report = state.get("report")
         for key in ("module_id", "answers", "case_details", "current_question_key", "report"):
             if key in data:
                 state[key] = data[key]
         if set(state["answers"]) - _ANSWER_KEYS:
             return jsonify({"error": "The case contains an unsupported answer."}), 400
 
-        cursor.execute("DELETE FROM case_facts WHERE case_id = %s", (case["case_id"],))
-        fact_rows = []
         for key, value in state["answers"].items():
-            value = str(value).lower() if isinstance(value, bool) else str(value)
-            fact_rows.append((case["case_id"], key, value))
-        fact_rows.append((case["case_id"], _CASE_STATE_KEY, json.dumps(state)))
-        cursor.executemany(
-            "INSERT INTO case_facts (case_id, fact_key, fact_value) VALUES (%s, %s, %s)",
-            fact_rows,
-        )
+            if previous_answers.get(key) != value:
+                state["timeline"].append(_timeline_event("Question answered", {"fact": key}))
+        if not previous_report and state.get("report"):
+            state["timeline"].append(_timeline_event("Guidance generated"))
+        state["timeline"].append(_timeline_event("Case saved"))
+
+        _persist_case_state(cursor, case["case_id"], state)
         if data.get("status"):
             cursor.execute(
                 "UPDATE cases SET status = %s WHERE case_id = %s",
@@ -249,6 +281,85 @@ def update_case(session_token):
     except Exception:
         conn.rollback()
         return jsonify({"error": "Unable to save this case."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@cases_bp.route("/api/cases/<session_token>/documents", methods=["POST"])
+def generate_case_document(session_token):
+    data = request.get_json(silent=True) or {}
+    document_type = data.get("document_type")
+    if document_type not in {"seller_complaint", "replacement_request", "refund_request"}:
+        return jsonify({"error": "Choose a supported document type."}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed."}), 500
+    cursor = conn.cursor(dictionary=True)
+    try:
+        case = _case_access(cursor, session_token)
+        if not case:
+            return jsonify({"error": "Case not found."}), 404
+        state = _read_case_state(cursor, case["case_id"])
+        if state.get("module_id") != "defective_product" or not state.get("report"):
+            return jsonify({"error": "Complete the Defective Product analysis first."}), 409
+
+        document_data = dict(state["case_details"])
+        document_data["desired_resolution"] = state["answers"].get("desired_resolution")
+        draft = TemplateGenerationService().generate_defective_product_document(
+            document_type, document_data
+        )
+        state["timeline"].append(_timeline_event("Document generated", {"document_type": document_type}))
+        _persist_case_state(cursor, case["case_id"], state)
+        conn.commit()
+        return jsonify({"success": True, "document_type": document_type, "draft": draft}), 200
+    except ValueError as error:
+        conn.rollback()
+        return jsonify({"error": str(error)}), 400
+    except Exception:
+        conn.rollback()
+        return jsonify({"error": "Unable to generate this document."}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@cases_bp.route("/api/cases/<session_token>/pdf", methods=["GET"])
+def export_case_pdf(session_token):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed."}), 500
+    cursor = conn.cursor(dictionary=True)
+    try:
+        from services.pdf_export import build_case_report_pdf
+
+        case = _case_access(cursor, session_token)
+        if not case:
+            return jsonify({"error": "Case not found."}), 404
+        state = _read_case_state(cursor, case["case_id"])
+        if state.get("module_id") != "defective_product" or not state.get("report"):
+            return jsonify({"error": "Complete the Defective Product analysis first."}), 409
+
+        state["timeline"].append(_timeline_event("PDF exported"))
+        pdf_bytes = build_case_report_pdf(
+            state["report"],
+            _case_label(case),
+            case["created_at"].isoformat() if hasattr(case["created_at"], "isoformat") else str(case["created_at"]),
+            state["answers"],
+            state["timeline"],
+        )
+        _persist_case_state(cursor, case["case_id"], state)
+        conn.commit()
+        return send_file(
+            BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"{_case_label(case)}-report.pdf",
+        )
+    except Exception:
+        conn.rollback()
+        return jsonify({"error": "Unable to export this case as PDF."}), 500
     finally:
         cursor.close()
         conn.close()

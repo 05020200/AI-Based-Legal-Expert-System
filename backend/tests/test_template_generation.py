@@ -117,3 +117,49 @@ def test_stored_template_used(setup_db):
     assert "Details: Defect description" in output
     # Issue placeholder should be filled via f-string in stored content
     assert "Issue: Defective Product" in output
+
+
+@pytest.mark.parametrize(
+    "document_type,expected_phrase",
+    [
+        ("seller_complaint", "Complaint about a product problem"),
+        ("replacement_request", "consider replacement"),
+        ("refund_request", "consider refund"),
+    ],
+)
+def test_defective_product_documents_use_case_values_and_placeholders(
+    setup_db, document_type, expected_phrase
+):
+    service = TemplateGenerationService()
+    draft = service.generate_defective_product_document(document_type, {
+        "product_name": "Laptop",
+        "seller_name": "Raju Electronics",
+        "purchase_date": "2026-10-01",
+        "amount_paid": 240000,
+        "order_or_invoice_number": "9876",
+        "problem_description": "Not working",
+        "seller_response": "Refused replacement",
+        "desired_resolution": "Replacement",
+    })
+    assert expected_phrase in draft
+    assert "Raju Electronics" in draft
+    assert "Laptop" in draft
+    assert "2026-10-01" in draft
+    assert "INR 240,000.00" in draft
+    assert "9876" in draft
+    assert "Not working" in draft
+    assert "Refused replacement" in draft
+    assert "[Consumer Name Not Provided]" in draft
+
+
+def test_defective_product_document_marks_missing_details():
+    service = TemplateGenerationService()
+    draft = service.generate_defective_product_document("seller_complaint", {})
+    assert "[Seller/Business Name Not Provided]" in draft
+    assert "[Product Name Not Provided]" in draft
+    assert "[Purchase Date Not Provided]" in draft
+    assert "[Amount Paid Not Provided]" in draft
+    assert "[Order/Invoice Number Not Provided]" in draft
+    assert "[Product Problem Not Provided]" in draft
+    assert "[Seller Response Not Provided]" in draft
+    assert "[Desired Resolution Not Provided]" in draft

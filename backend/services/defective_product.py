@@ -6,6 +6,7 @@ from inference_engine.backward_chaining import BackwardChainingEngine
 from inference_engine.forward_chaining import ForwardChainingEngine
 from inference_engine.reasoning_trace import ReasoningTrace
 from inference_engine.working_memory import WorkingMemory
+from services.authority_info import AuthorityInfoService
 from services.document_recommendation import DocumentRecommendationService
 from services.legal_guidance import LegalGuidanceService
 
@@ -204,10 +205,26 @@ class DefectiveProductService:
         conclusions = set(inference_result["conclusions"])
         issue_identified = "possible_defective_product_issue" in conclusions
 
-        guidance = LegalGuidanceService().get_guidance(
-            ["defective_product_issue"] if issue_identified else []
+        guidance_conclusions = []
+        if issue_identified:
+            guidance_conclusions = [
+                "defective_product_issue",
+                "consumer_complaint_route_available",
+            ]
+        guidance = LegalGuidanceService().get_guidance(guidance_conclusions)
+        provisions = [
+            provision
+            for entry in guidance
+            for provision in entry.get("applicable_law", [])
+        ]
+        provision = next(
+            (item for item in provisions if item.get("section_number") == "Section 2(10)"),
+            None,
         )
-        provision = guidance[0]["applicable_law"][0] if guidance else None
+        complaint_provision = next(
+            (item for item in provisions if item.get("section_number") == "Section 35"),
+            None,
+        )
         available_evidence = [
             identifier
             for identifier, fact_key in _EVIDENCE_FACTS.items()
@@ -225,6 +242,9 @@ class DefectiveProductService:
         ]
 
         details = cls._normalize_case_details(case_details)
+        complaint_information = cls._complaint_information(
+            details.get("amount_paid"), complaint_provision
+        )
         summary = {
             "selected_issue": "Defective Product",
             "product_purchased": facts.get("product_purchased"),
@@ -247,16 +267,25 @@ class DefectiveProductService:
         }
 
         if issue_identified:
-            assessment = (
-                "Based on the information provided, this may indicate a consumer issue involving a defective product."
-            )
+            if "consumer_guidance_required" in conclusions:
+                assessment = (
+                    "Based on the information provided, this may indicate a possible consumer dispute involving a defect in the product."
+                )
+            else:
+                assessment = (
+                    "Based on the information provided, this may indicate a possible consumer issue involving a defective product."
+                )
             why_relevant = (
                 "You reported purchasing a product from a seller or business and that the product has a problem. "
-                "Those facts may be relevant to whether the goods have a defect; this report does not decide that question."
+                "Those facts may be relevant to whether the goods have a defect under Section 2(10); this report does not decide that question."
             )
             possible_options = [
                 "You may ask the seller about repair, replacement, or refund, depending on the circumstances and applicable law."
             ]
+            if "consumer_guidance_required" in conclusions:
+                possible_options.append(
+                    "If the issue remains unresolved, you may consider grievance support or a formal consumer complaint under the applicable procedure."
+                )
             if desired_resolution:
                 possible_options.append(f"Your stated preference is: {desired_resolution}.")
         else:
@@ -273,12 +302,12 @@ class DefectiveProductService:
             )
 
         next_steps = [
-            "Keep the purchase receipt, clear photographs or videos of the problem, and copies of relevant seller communications.",
+            "Keep the purchase invoice or receipt, photographs or videos of the product problem, and copies of seller communications you have.",
         ]
         if facts.get("seller_contacted") is False:
             next_steps.insert(
                 0,
-                "Consider contacting the seller in writing, describing the problem and the resolution you prefer; keep a copy of the message.",
+                "Consider making a written complaint to the seller describing the product problem and your preferred resolution; keep a copy.",
             )
         elif facts.get("seller_contacted") is True and facts.get("seller_resolved") is False:
             next_steps.insert(
@@ -286,14 +315,26 @@ class DefectiveProductService:
                 "Keep a dated record of your contact with the seller and any response.",
             )
         next_steps.extend([
-            "For grievance assistance, contact the National Consumer Helpline at 1915 or use its official portal: https://consumerhelpline.gov.in/.",
-            "Section 35 of the Consumer Protection Act, 2019 provides for making a complaint before the District Commission. Check current filing instructions and the applicable forum through official consumer-affairs sources before filing.",
+            "Keep your order, invoice, and complaint/reference number together with the other records you have.",
+            "If the problem remains unresolved, consider seeking grievance assistance or making a complaint before the competent Consumer Commission; check current official filing instructions.",
         ])
 
         report = {
             "title": "Defective Product Legal Guidance Report",
+            "your_situation": summary,
             "assessment": assessment,
+            "possible_issue": assessment,
             "why_relevant": why_relevant,
+            "legal_provisions": [
+                {
+                    "act_name": item.get("act_name"),
+                    "section_number": item.get("section_number"),
+                    "title": item.get("title"),
+                    "description": item.get("plain_language_description"),
+                    "source_url": item.get("source_url"),
+                }
+                for item in provisions
+            ],
             "legal_provision": {
                 "act_name": provision.get("act_name"),
                 "section_number": provision.get("section_number"),
@@ -304,10 +345,12 @@ class DefectiveProductService:
             "possible_options": possible_options,
             "evidence_checklist": evidence_checklist,
             "next_steps": next_steps,
+            "where_to_complain": complaint_information,
             "case_summary": summary,
             "disclaimer": (
-                "This is preliminary legal information for educational purposes, not legal advice. "
-                "It is not a final determination of your rights or the merits of a complaint."
+                "This system provides preliminary legal information based on the facts and legal knowledge configured in the system. "
+                "It is not a substitute for advice from a qualified legal professional. Legal outcomes depend on the specific facts, "
+                "evidence, applicable law, and decisions of the competent authority."
             ),
         }
 
@@ -321,11 +364,63 @@ class DefectiveProductService:
             "case_details": details,
             "report": report,
             "internal": {
+                "initial_facts": inference_result["initial_facts"],
+                "derived_facts": inference_result["derived_facts"],
+                "rules_fired": inference_result["fired_rules"],
+                "final_facts": memory.get_all_facts(),
                 "conclusions": inference_result["conclusions"],
                 "reasoning_trace": trace.get_steps(),
                 "backward_result": backward_result,
                 "missing_question_keys": sorted(missing_question_keys),
             },
+        }
+
+    @staticmethod
+    def _complaint_information(amount_paid, complaint_provision):
+        authority_service = AuthorityInfoService()
+        territorial_factors = authority_service.get_territorial_jurisdiction_info()[
+            "territorial_jurisdiction"
+        ]
+        pecuniary = {
+            "determined": False,
+            "message": "Amount paid was not provided, so this report cannot estimate the pecuniary commission level.",
+            "source": "Consumer Protection (Jurisdiction of the District Commission, the State Commission and the National Commission) Rules, 2021",
+        }
+        if amount_paid is not None:
+            information = authority_service.get_authority_information(amount_paid)
+            authority = information.get("authority") if isinstance(information, dict) else None
+            if authority:
+                pecuniary = {
+                    "determined": True,
+                    "authority": authority["name"],
+                    "jurisdiction_level": authority["jurisdiction_level"],
+                    "consideration_paid": amount_paid,
+                    "monetary_basis": authority.get("monetary_basis"),
+                    "source": "Consumer Protection (Jurisdiction of the District Commission, the State Commission and the National Commission) Rules, 2021",
+                    "verification_source": authority_service._JURISDICTION_SOURCE,
+                    "message": "This is an informational estimate based on the amount entered, not a final jurisdiction determination.",
+                }
+            else:
+                pecuniary = {
+                    "determined": False,
+                    "message": "The configured authority information could not determine a commission level from this amount.",
+                    "source": "Consumer Protection (Jurisdiction of the District Commission, the State Commission and the National Commission) Rules, 2021",
+                }
+
+        return {
+            "grievance_support": {
+                "name": "National Consumer Helpline",
+                "phone": "1915",
+                "url": "https://consumerhelpline.gov.in/",
+                "description": "A consumer grievance-support channel; it is distinct from a formal Consumer Commission complaint.",
+            },
+            "formal_complaint": {
+                "provision": complaint_provision,
+                "message": "Section 35 of the Consumer Protection Act, 2019 describes how a consumer complaint may be made. Use the current official instructions for the competent Commission.",
+            } if complaint_provision else None,
+            "pecuniary_jurisdiction": pecuniary,
+            "territorial_jurisdiction_factors": territorial_factors,
+            "territorial_note": "The appropriate place also depends on the opposite party's residence or business, where the cause of action arose, and the complainant's residence or place of work, as applicable.",
         }
 
     @staticmethod
