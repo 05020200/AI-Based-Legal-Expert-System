@@ -1,5 +1,13 @@
 [
   {"fact_key": "product_purchased", "domain": "consumer", "description": "The consumer purchased a product."},
+  {"fact_key": "product_has_problem", "domain": "consumer", "description": "The purchased product has a fault, damage, malfunction, or other problem."},
+  {"fact_key": "seller_resolved", "domain": "consumer", "description": "The seller resolved the reported product problem."},
+  {"fact_key": "problem_evidence_available", "domain": "consumer", "description": "Evidence showing the product problem is available."},
+  {"fact_key": "seller_communication_available", "domain": "consumer", "description": "Communication records with the seller are available."},
+  {"fact_key": "desired_resolution", "domain": "consumer", "description": "The consumer's preferred resolution for the product problem."},
+  {"fact_key": "possible_defective_product_issue", "domain": "consumer", "description": "The purchase and reported product problem may indicate a defective-product issue."},
+  {"fact_key": "unresolved_defective_product_issue", "domain": "consumer", "description": "The reported product problem remains unresolved after contacting the seller."},
+  {"fact_key": "consumer_guidance_required", "domain": "consumer", "description": "Preliminary guidance may be useful for an unresolved defective-product issue."},
   {"fact_key": "product", "domain": "consumer", "description": "The type or name of the product purchased."},
   {"fact_key": "product_defective", "domain": "consumer", "description": "The purchased product is defective."},
   {"fact_key": "damaged_on_delivery", "domain": "consumer", "description": "The product was already damaged when delivered or received."},

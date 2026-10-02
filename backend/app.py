@@ -15,6 +15,7 @@ from services.legal_guidance import LegalGuidanceService
 from services.authority_info import AuthorityInfoService
 from services.document_recommendation import DocumentRecommendationService
 from services.fact_extraction import FactExtractor
+from services.defective_product import DefectiveProductService
 import uuid
 
 
@@ -86,6 +87,58 @@ def health_check():
         "status": "healthy",
         "message": "Legal Expert System Backend is running."
     })
+
+
+@app.route("/api/phase1/questions", methods=["GET"])
+def phase1_questions():
+    return jsonify({"questions": DefectiveProductService.get_questions()}), 200
+
+
+@app.route("/api/phase1/analyze", methods=["POST"])
+def analyze_defective_product():
+    if not request.is_json:
+        return jsonify({"error": "A JSON request body is required."}), 400
+
+    data = request.get_json() or {}
+    answers = data.get("answers", {})
+    case_details = data.get("case_details", {})
+    if not isinstance(answers, dict) or not isinstance(case_details, dict):
+        return jsonify({"error": "Answers and case details must be objects."}), 400
+
+    required_keys = {
+        "product_purchased",
+        "product_has_problem",
+        "seller_contacted",
+        "seller_resolved",
+        "desired_resolution",
+        "purchase_proof_available",
+        "problem_evidence_available",
+        "seller_communication_available",
+    }
+    if not required_keys.issubset(answers):
+        return jsonify({"error": "Please answer all eight questionnaire questions."}), 400
+
+    try:
+        result = DefectiveProductService.analyze(answers, case_details)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except (OSError, json.JSONDecodeError) as error:
+        app.logger.exception("Unable to prepare Phase 1 guidance")
+        return jsonify({"error": "Unable to prepare the guidance report."}), 500
+
+    session_token, guest_session = _get_or_create_session(data.get("session_token"))
+    guest_session["facts"] = result["facts"]
+    guest_session["case_details"] = result["case_details"]
+    guest_session["reasoning_trace"] = result["internal"]["reasoning_trace"]
+    guest_session["backward_result"] = result["internal"]["backward_result"]
+    guest_session["report"] = result["report"]
+    guest_session["messages"].append({"role": "assistant", "summary": "Defective Product report prepared"})
+
+    return jsonify({
+        "success": True,
+        "session_token": session_token,
+        "report": result["report"],
+    }), 200
 
 
 # ---------------------------------------------------------

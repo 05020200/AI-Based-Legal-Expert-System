@@ -24,16 +24,16 @@ const glossaryOverlay = document.getElementById('glossary-overlay');
 const closeGlossary = document.getElementById('close-glossary');
 const glossarySearch = document.getElementById('glossary-search');
 const glossaryResults = document.getElementById('glossary-results');
+const questionnaire = document.getElementById('questionnaire');
+const questionFields = document.getElementById('question-fields');
+let questionnaireQuestions = [];
+let currentReport = null;
 
 axios.defaults.withCredentials = true;
 
 // Boot up — no auth check needed
 document.addEventListener('DOMContentLoaded', () => {
-    // Chat listeners
-    sendBtn.addEventListener('click', handleSend);
-    userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSend();
-    });
+    questionnaire.addEventListener('submit', handleQuestionnaireSubmit);
     newChatBtn.addEventListener('click', startNewCase);
 
     // Export listeners
@@ -51,16 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Quick-reply suggestion buttons
-    const quickBtns = document.querySelectorAll('.quick-reply-btn[data-text]');
-    quickBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            userInput.value = btn.getAttribute('data-text');
-            handleSend();
-        });
-    });
-
-    // Start with a fresh session
     startNewCase();
 });
 
@@ -73,24 +63,73 @@ function startNewCase() {
     if (exportLink) exportLink.classList.add('hidden');
     currentFacts = {};
     currentCaseDetails = {};
+    currentReport = null;
     currentSessionToken = null; // will be assigned by the backend on first message
+    loadQuestionnaire();
 }
 
 
-async function handleSend() {
-    const text = userInput.value.trim();
-    if (!text) return;
+async function loadQuestionnaire() {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/phase1/questions`);
+        questionnaireQuestions = response.data.questions;
+        questionFields.innerHTML = questionnaireQuestions.map(renderQuestion).join('');
+    } catch (error) {
+        questionFields.innerHTML = '<p role="alert">The questionnaire could not be loaded. Please refresh and try again.</p>';
+    }
+}
 
-    appendMessage('user', text);
-    userInput.value = '';
-    welcomeState.classList.add('hidden');
+
+function renderQuestion(question) {
+    const key = escapeHtml(question.key);
+    const prompt = escapeHtml(question.prompt);
+    if (question.type === 'choice') {
+        const options = question.options.map(option =>
+            `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`
+        ).join('');
+        return `<label class="question-field" for="question-${key}">
+            <span>${prompt}</span>
+            <select id="question-${key}" name="${key}" required>
+                <option value="" selected disabled>Select an option</option>${options}
+            </select>
+        </label>`;
+    }
+
+    const options = question.options.map((option, index) => `
+        <label class="answer-option" for="question-${key}-${index}">
+            <input id="question-${key}-${index}" type="radio" name="${key}" value="${option.value}" required>
+            <span>${escapeHtml(option.label)}</span>
+        </label>`).join('');
+    return `<fieldset class="question-field">
+        <legend>${prompt}</legend>
+        <div class="answer-options">${options}</div>
+    </fieldset>`;
+}
+
+
+async function handleQuestionnaireSubmit(event) {
+    event.preventDefault();
+    if (!questionnaire.reportValidity()) return;
+
+    const formData = new FormData(questionnaire);
+    const answers = {};
+    questionnaireQuestions.forEach(question => {
+        const value = formData.get(question.key);
+        answers[question.key] = question.type === 'boolean' ? value === 'true' : value;
+    });
+    const caseDetails = {};
+    ['product_name', 'seller_name', 'purchase_date', 'amount_paid',
+        'order_or_invoice_number', 'problem_description', 'seller_response'].forEach(key => {
+        const value = String(formData.get(key) || '').trim();
+        if (value) caseDetails[key] = value;
+    });
+
     typingIndicator.classList.remove('hidden');
 
     try {
-        const res = await axios.post(`${API_BASE_URL}/analyze`, {
-            text: text,
-            facts: currentFacts,
-            case_details: currentCaseDetails,
+        const res = await axios.post(`${API_BASE_URL}/phase1/analyze`, {
+            answers,
+            case_details: caseDetails,
             session_token: currentSessionToken
         });
 
@@ -99,181 +138,99 @@ async function handleSend() {
     } catch (error) {
         typingIndicator.classList.add('hidden');
         console.error('API error:', error);
-        appendMessage('assistant', '<p>I encountered an error processing your request. Please check that the backend server is running and try again.</p>');
+        const message = error.response?.data?.error || 'The report could not be prepared. Please try again.';
+        appendMessage('assistant', `<p role="alert">${escapeHtml(message)}</p>`);
     }
 }
 
 
 function processResponse(data) {
     if (!data.success) {
-        appendMessage('assistant', '<p>Sorry, something went wrong.</p>');
+        appendMessage('assistant', '<p role="alert">The report could not be prepared. Please try again.</p>');
         return;
     }
 
-    // Store session token and accumulated facts
     currentSessionToken = data.session_token;
-    currentFacts = data.case.facts;
-    currentCaseDetails = data.case.case_details || {};
-
-    // Add to local case history
+    currentReport = data.report;
     addToHistory(currentSessionToken);
-
-    let responseHtml = '';
-
-    // 1. Conflicts
-    if (data.conflicts && data.conflicts.length > 0) {
-        responseHtml += '<div class="legal-card" style="border-left: 3px solid #e53e3e;">';
-        responseHtml += '<h4 style="color:#e53e3e;">⚠ Potential Conflict</h4>';
-        data.conflicts.forEach(c => responseHtml += `<p>${c}</p>`);
-        responseHtml += '</div>';
-    }
-
-    // 2. Out-of-scope message
-    if (data.out_of_scope && data.targeted_question) {
-        responseHtml += `<p>${data.targeted_question}</p>`;
-        appendMessage('assistant', responseHtml);
-        return;
-    }
-
-    // 3. Targeted follow-up question (backward chaining)
-    if (data.targeted_question && (!data.legal_guidance || data.legal_guidance.length === 0)) {
-        responseHtml += `<p>${data.targeted_question}</p>`;
-        appendMessage('assistant', responseHtml);
-        updateCasePanel(data);
-        return;
-    }
-
-    // 4. Legal guidance available
-    if (data.legal_guidance && data.legal_guidance.length > 0) {
-        data.legal_guidance.forEach(g => {
-            responseHtml += `<p>Based on what you've told me, this may involve <strong>${g.issue}</strong>.</p>`;
-
-            if (g.applicable_law && g.applicable_law.length > 0) {
-                g.applicable_law.forEach(p => {
-                    responseHtml += `
-                    <div class="legal-card">
-                        <h4>📜 Relevant Law</h4>
-                        <h3>${p.act_name} — ${p.section_number}</h3>
-                        <div class="law-section">
-                            <strong>${p.title}</strong>
-                            ${p.plain_language_description ? `<p>${p.plain_language_description}</p>` : ''}
-                            ${p.applicability ? `<p><em>Applicability:</em> ${p.applicability}</p>` : ''}
-                        </div>
-                    </div>`;
-                });
-            }
-
-            if (g.possible_remedies && g.possible_remedies.length > 0) {
-                responseHtml += '<div class="list-section mt-4"><h5>💡 Possible Remedies</h5><ul>';
-                g.possible_remedies.forEach(r => responseHtml += `<li>${r}</li>`);
-                responseHtml += '</ul></div>';
-            }
-
-            if (g.next_steps && g.next_steps.length > 0) {
-                responseHtml += '<div class="list-section mt-4"><h5>📋 Next Steps</h5><ul>';
-                g.next_steps.forEach(step => responseHtml += `<li>${step}</li>`);
-                responseHtml += '</ul></div>';
-            }
-        });
-
-        // Where/how to complain
-        if (data.authority) {
-            if (data.authority.authority) {
-                const auth = data.authority.authority;
-                responseHtml += `
-                <div class="legal-card">
-                    <h4>🏛 Where to Complain</h4>
-                    <p><strong>${auth.name}</strong> (${auth.jurisdiction_level || ''})</p>
-                    ${auth.description ? `<p>${auth.description}</p>` : ''}
-                </div>`;
-            } else if (data.authority.note) {
-                responseHtml += `<p><em>${data.authority.note}</em></p>`;
-            }
-        }
-
-        // Offer to generate a complaint draft
-        responseHtml += '<p style="margin-top:1rem; font-size:0.9em; color: var(--text-muted);"><em>If you would like a draft complaint template, just say "generate a complaint draft".</em></p>';
-
-        // Show export button
-        if (exportBtn) exportBtn.classList.remove('hidden');
-        if (exportLink) exportLink.classList.remove('hidden');
-
-    } else if (data.targeted_question) {
-        // We have guidance AND a targeted question — show both
-        responseHtml += `<p>${data.targeted_question}</p>`;
-    } else {
-        responseHtml += '<p>I need more information to identify the exact legal issue. Could you clarify what happened?</p>';
-    }
-
-    appendMessage('assistant', responseHtml);
-    updateCasePanel(data);
+    welcomeState.classList.add('hidden');
+    appendMessage('assistant', renderReport(data.report));
+    updateCasePanel(data.report);
+    if (exportBtn) exportBtn.classList.remove('hidden');
+    if (exportLink) exportLink.classList.remove('hidden');
 }
 
 
-function updateCasePanel(data) {
+function renderReport(report) {
+    const law = report.legal_provision ? `
+        <section class="legal-card">
+            <h3>Relevant Legal Provision</h3>
+            <h4>${escapeHtml(report.legal_provision.act_name)} — ${escapeHtml(report.legal_provision.section_number)}</h4>
+            <strong>${escapeHtml(report.legal_provision.title)}</strong>
+            <p>${escapeHtml(report.legal_provision.description)}</p>
+            <a href="${escapeHtml(report.legal_provision.source_url)}" target="_blank" rel="noopener noreferrer">View source</a>
+        </section>` : '';
+    const options = report.possible_options.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    const evidence = report.evidence_checklist.map(item => `
+        <li>${escapeHtml(item.name)} <span>${item.available ? 'Available' : 'Not currently available'}</span></li>`).join('');
+    const steps = report.next_steps.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+
+    return `<h2>${escapeHtml(report.title)}</h2>
+        <p class="report-assessment">${escapeHtml(report.assessment)}</p>
+        <section class="legal-card"><h3>Why these facts may matter</h3><p>${escapeHtml(report.why_relevant)}</p></section>
+        ${law}
+        <section class="legal-card"><h3>Possible options</h3><ul>${options}</ul></section>
+        <section class="legal-card"><h3>Evidence to preserve</h3><ul class="report-evidence">${evidence}</ul></section>
+        <section class="legal-card"><h3>Practical next steps</h3><ul>${steps}</ul></section>
+        <section class="legal-card"><h3>Case Summary</h3>${renderSummary(report.case_summary)}</section>
+        <p class="report-disclaimer">${escapeHtml(report.disclaimer)}</p>`;
+}
+
+
+function renderSummary(summary) {
+    const resolution = summary.seller_response_resolution;
+    const items = [
+        ['Selected issue', summary.selected_issue],
+        ['Purchased from a seller or business', yesNo(summary.product_purchased)],
+        ['Product has a problem', yesNo(summary.product_has_problem)],
+        ['Product name', summary.product_name],
+        ['Seller name', summary.seller_name],
+        ['Purchase date', summary.purchase_date],
+        ['Amount paid', summary.amount_paid === null ? null : summary.amount_paid],
+        ['Order / invoice number', summary.order_or_invoice_number],
+        ['Problem / situation', summary.problem_situation],
+        ['Seller contacted', yesNo(summary.seller_contacted)],
+        ['Seller resolution', yesNo(resolution.problem_resolved)],
+        ['Seller response details', resolution.response_details],
+        ['Desired resolution', summary.desired_resolution],
+    ];
+    Object.entries(summary.evidence_availability).forEach(([name, available]) => {
+        items.push([`Evidence: ${name}`, yesNo(available)]);
+    });
+    return `<dl class="summary-list">${items.map(([label, value]) => `
+        <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value === null || value === undefined || value === '' ? 'Not provided' : value)}</dd></div>`).join('')}
+    </dl>`;
+}
+
+
+function yesNo(value) {
+    return value === true ? 'Yes' : value === false ? 'No' : 'Not provided';
+}
+
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+}
+
+
+function updateCasePanel(report) {
     casePanel.classList.remove('hidden');
-    const f = data.case.facts;
-
-    // 1. Summary
-    let summaryHtml = "<ul>";
-    if (f.product) summaryHtml += `<li><strong>Product:</strong> ${f.product}</li>`;
-    if (f.product_purchased) summaryHtml += `<li><strong>Status:</strong> Purchased</li>`;
-    if (f.product_defective) summaryHtml += `<li><strong>Issue:</strong> Defective/Damaged</li>`;
-    if (f.service_purchased) summaryHtml += `<li><strong>Service:</strong> Purchased</li>`;
-    if (f.service_deficient) summaryHtml += `<li><strong>Service Issue:</strong> Deficient</li>`;
-    if (f.seller_contacted) summaryHtml += `<li><strong>Contact:</strong> Seller contacted</li>`;
-    if (f.seller_denied_or_disputed_claim) summaryHtml += `<li><strong>Response:</strong> Claim denied/refused</li>`;
-    if (f.refund_requested) summaryHtml += `<li><strong>Remedy:</strong> Refund requested</li>`;
-    if (f.replacement_requested) summaryHtml += `<li><strong>Remedy:</strong> Replacement requested</li>`;
-    if (f.warranty_exists) summaryHtml += `<li><strong>Warranty:</strong> Product under warranty</li>`;
-    if (f.online_transaction) summaryHtml += `<li><strong>Channel:</strong> Online purchase</li>`;
-    if (f.product_not_delivered) summaryHtml += `<li><strong>Delivery:</strong> Not delivered</li>`;
-    if (f.wrong_product_delivered) summaryHtml += `<li><strong>Delivery:</strong> Wrong product</li>`;
-    if (f.misleading_advertisement) summaryHtml += `<li><strong>Ad:</strong> Misleading advertisement</li>`;
-    if (f.damaged_on_delivery === true) summaryHtml += `<li><strong>Timing:</strong> Damaged on delivery</li>`;
-    if (f.damaged_on_delivery === false) summaryHtml += `<li><strong>Timing:</strong> Damaged after use</li>`;
-
-    if (data.legal_guidance && data.legal_guidance.length > 0) {
-        data.legal_guidance.forEach(g => {
-            summaryHtml += `<li><strong>Identified Issue:</strong> ${g.issue}</li>`;
-        });
-    }
-    summaryHtml += "</ul>";
-    if (summaryHtml === "<ul></ul>") summaryHtml = "<p>No facts gathered yet.</p>";
-    caseSummaryContent.innerHTML = summaryHtml;
-
-    // 2. Timeline
-    let timelineHtml = '<ul>';
-    if (f.product_purchased || f.service_purchased) timelineHtml += '<li>✓ Product/Service purchased</li>';
-    if (f.product_defective || f.service_deficient) timelineHtml += '<li>✓ Issue identified (defect/deficiency)</li>';
-    if (f.seller_contacted) timelineHtml += '<li>✓ Seller contacted</li>';
-    if (f.seller_denied_or_disputed_claim) timelineHtml += '<li>✓ Seller denied/disputed claim</li>';
-    if (f.refund_requested || f.replacement_requested) timelineHtml += '<li>✓ Refund/replacement requested</li>';
-    if (data.legal_guidance && data.legal_guidance.length > 0) timelineHtml += '<li>→ Legal issue identified</li>';
-    timelineHtml += '</ul>';
-    if (timelineHtml === '<ul></ul>') timelineHtml = '<p>Timeline will populate as you share details.</p>';
-    caseTimeline.innerHTML = timelineHtml;
-
-    // 3. Evidence Checklist
-    if (data.documents && data.documents.recommended_documents_display) {
-        let evHtml = '<ul>';
-        data.documents.recommended_documents_display.forEach(doc => {
-            evHtml += `<li>${doc.name}</li>`;
-        });
-        evHtml += '</ul>';
-        if (evHtml === '<ul></ul>') evHtml = '<p>No specific evidence required yet.</p>';
-        evidenceChecklist.innerHTML = evHtml;
-    } else {
-        // Fallback evidence checklist
-        let evHtml = "<ul>";
-        if (f.online_transaction) evHtml += "<li>Order Confirmation</li><li>Online Payment Receipt</li>";
-        if (f.product_defective) evHtml += "<li>Photos of Defect</li><li>Videos of Malfunction</li>";
-        if (f.seller_contacted) evHtml += "<li>Emails/Chats with Seller</li>";
-        if (f.warranty_exists) evHtml += "<li>Warranty Card/Document</li>";
-        evHtml += "</ul>";
-        if (evHtml === "<ul></ul>") evHtml = "<p>No specific evidence required yet.</p>";
-        evidenceChecklist.innerHTML = evHtml;
-    }
+    caseSummaryContent.innerHTML = renderSummary(report.case_summary);
+    evidenceChecklist.innerHTML = `<ul>${report.evidence_checklist.map(item => `
+        <li>${escapeHtml(item.name)} <span>${item.available ? 'Available' : 'Not currently available'}</span></li>`).join('')}
+    </ul>`;
 }
 
 
@@ -339,31 +296,60 @@ function renderHistory() {
 // ---------------------------------------------------------
 
 async function handleExport() {
-    if (!currentSessionToken) {
-        appendMessage('assistant', '<p>No active case to export. Please start a conversation first.</p>');
+    if (!currentReport) {
+        appendMessage('assistant', '<p>Prepare a guidance report before exporting.</p>');
         return;
     }
 
-    try {
-        const res = await axios.post(`${API_BASE_URL}/export`, {
-            session_token: currentSessionToken
-        });
-
-        if (res.data.success) {
-            // Create a downloadable JSON file
-            const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `case_export_${currentSessionToken.substring(0, 8)}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            appendMessage('assistant', '<p>📄 Case exported successfully.</p>');
-        }
-    } catch (e) {
-        console.error('Export error:', e);
-        appendMessage('assistant', '<p>Failed to export case. Please try again.</p>');
-    }
+    const report = currentReport;
+    const summary = report.case_summary;
+    const resolution = summary.seller_response_resolution;
+    const lines = [
+        report.title,
+        '',
+        report.assessment,
+        '',
+        'Why these facts may matter',
+        report.why_relevant,
+        '',
+        'Relevant legal provision',
+        report.legal_provision
+            ? `${report.legal_provision.act_name} — ${report.legal_provision.section_number}: ${report.legal_provision.title}\n${report.legal_provision.description}\nSource: ${report.legal_provision.source_url}`
+            : 'No provision identified from the answers provided.',
+        '',
+        'Possible options',
+        ...report.possible_options.map(item => `- ${item}`),
+        '',
+        'Evidence to preserve',
+        ...report.evidence_checklist.map(item => `- ${item.name}: ${item.available ? 'Available' : 'Not currently available'}`),
+        '',
+        'Practical next steps',
+        ...report.next_steps.map(item => `- ${item}`),
+        '',
+        'Case summary',
+        `Selected issue: ${summary.selected_issue}`,
+        `Purchased from a seller or business: ${yesNo(summary.product_purchased)}`,
+        `Product has a problem: ${yesNo(summary.product_has_problem)}`,
+        `Product name: ${summary.product_name || 'Not provided'}`,
+        `Seller name: ${summary.seller_name || 'Not provided'}`,
+        `Purchase date: ${summary.purchase_date || 'Not provided'}`,
+        `Amount paid: ${summary.amount_paid ?? 'Not provided'}`,
+        `Order / invoice number: ${summary.order_or_invoice_number || 'Not provided'}`,
+        `Problem / situation: ${summary.problem_situation || 'Not provided'}`,
+        `Seller contacted: ${yesNo(summary.seller_contacted)}`,
+        `Seller resolved problem: ${yesNo(resolution.problem_resolved)}`,
+        `Seller response: ${resolution.response_details || 'Not provided'}`,
+        `Desired resolution: ${summary.desired_resolution}`,
+        '',
+        report.disclaimer,
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'defective_product_guidance_report.txt';
+    link.click();
+    URL.revokeObjectURL(url);
 }
 
 

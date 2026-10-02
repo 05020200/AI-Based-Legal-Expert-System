@@ -46,11 +46,8 @@ def test_defective_product_documents(setup_db):
     # Recommended list should contain the mapped docs
     expected_recommended = [
         "purchase_invoice",
-        "order_confirmation",
-        "warranty_document",
         "defect_photos",
         "seller_communication",
-        "payment_proof",
     ]
     assert result["recommended_documents"] == expected_recommended
     # Available docs are correctly echoed

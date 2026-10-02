@@ -1,0 +1,35 @@
+[
+  {
+    "rule_id": "DP1",
+    "domain": "consumer",
+    "rule_name": "Identify possible defective product issue",
+    "conditions": [
+      {"fact_key": "product_purchased", "operator": "==", "expected_value": "true"},
+      {"fact_key": "product_has_problem", "operator": "==", "expected_value": "true"}
+    ],
+    "conclusion": "possible_defective_product_issue",
+    "explanation": "The user reports buying a product from a seller or business and reports a problem with it."
+  },
+  {
+    "rule_id": "DP2",
+    "domain": "consumer",
+    "rule_name": "Identify unresolved defective product issue",
+    "conditions": [
+      {"fact_key": "possible_defective_product_issue", "operator": "==", "expected_value": "true"},
+      {"fact_key": "seller_contacted", "operator": "==", "expected_value": "true"},
+      {"fact_key": "seller_resolved", "operator": "==", "expected_value": "false"}
+    ],
+    "conclusion": "unresolved_defective_product_issue",
+    "explanation": "The seller was contacted about the reported product problem and it remains unresolved."
+  },
+  {
+    "rule_id": "DP3",
+    "domain": "consumer",
+    "rule_name": "Identify consumer guidance need",
+    "conditions": [
+      {"fact_key": "unresolved_defective_product_issue", "operator": "==", "expected_value": "true"}
+    ],
+    "conclusion": "consumer_guidance_required",
+    "explanation": "The reported defective-product problem remains unresolved after contacting the seller."
+  }
+]

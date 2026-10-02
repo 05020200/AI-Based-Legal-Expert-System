@@ -18,11 +18,8 @@ class DocumentRecommendationService:
         # Consumer domain
         "defective product": [
             "purchase_invoice",
-            "order_confirmation",
-            "warranty_document",
             "defect_photos",
             "seller_communication",
-            "payment_proof",
         ],
         "refund / replacement issue": [
             "purchase_invoice",

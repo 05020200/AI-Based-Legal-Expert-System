@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consumer Legal Expert System</title>
-    <meta name="description" content="AI-powered consumer legal guidance system for Indian consumer law. Get help with defective products, refunds, warranties, and more.">
+    <meta name="description" content="Preliminary information for consumer issues involving defective products.">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -49,21 +49,30 @@
                 <div class="chat-container" id="chat-container">
                     <div id="welcome-state" class="welcome-state">
                         <div class="welcome-icon">⚖</div>
-                        <h1>Consumer Legal Assistant</h1>
-                        <p>I can assist you with defective products, refunds, warranties, misleading ads, and e-commerce disputes.</p>
-                        <div class="quick-replies" id="welcome-suggestions">
-                            <button class="quick-reply-btn" data-text="I bought a product and it is defective.">Defective Product</button>
-                            <button class="quick-reply-btn" data-text="The seller refused to give me a refund.">Refund Problem</button>
-                            <button class="quick-reply-btn" data-text="I hired a service and it was very poor quality.">Bad Service</button>
-                            <button class="quick-reply-btn" data-text="The product was different from the advertisement.">Misleading Ad</button>
-                        </div>
+                        <h1>Defective Product</h1>
+                        <p>Answer a few questions to receive preliminary legal information about a product problem.</p>
+                        <form id="questionnaire" class="questionnaire">
+                            <div id="question-fields" class="question-fields"></div>
+                            <fieldset class="details-fields">
+                                <legend>Optional case details</legend>
+                                <div class="detail-grid">
+                                    <label>Product name<input name="product_name" autocomplete="off"></label>
+                                    <label>Seller or business name<input name="seller_name" autocomplete="organization"></label>
+                                    <label>Purchase date<input name="purchase_date" type="date"></label>
+                                    <label>Amount paid<input name="amount_paid" type="number" min="0" step="any" inputmode="decimal"></label>
+                                    <label>Order or invoice number<input name="order_or_invoice_number" autocomplete="off"></label>
+                                    <label class="wide-field">Describe the product problem<textarea name="problem_description" rows="3"></textarea></label>
+                                    <label class="wide-field">What did the seller say or do?<textarea name="seller_response" rows="3"></textarea></label>
+                                </div>
+                            </fieldset>
+                            <button class="submit-questionnaire" type="submit">Prepare guidance report</button>
+                        </form>
                     </div>
 
-                    <!-- Chat messages will be injected here -->
                     <div id="chat-messages" class="chat-messages"></div>
                     
                     <div id="typing-indicator" class="typing-indicator hidden">
-                        <span>Analyzing legal rules...</span>
+                        <span>Preparing your report...</span>
                     </div>
                 </div>
 
@@ -72,15 +81,12 @@
                     <h3>Case Summary</h3>
                     <div id="case-summary-content"></div>
                     
-                    <h3 class="mt-4">Timeline</h3>
-                    <div id="case-timeline"></div>
-                    
                     <h3 class="mt-4">Evidence Checklist</h3>
                     <div id="evidence-checklist"></div>
                 </div>
             </div>
 
-            <div class="input-area">
+            <div class="input-area hidden">
                 <div class="input-wrapper">
                     <input type="text" id="user-input" placeholder="Describe your consumer issue..." autocomplete="off" />
                     <button id="send-btn" class="send-btn">
