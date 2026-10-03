@@ -618,9 +618,10 @@ def export_case_pdf(session_token):
         if not case:
             return jsonify({"error": "Case not found."}), 404
         state = _read_case_state(cursor, case["case_id"])
-        if state.get("module_id") != "defective_product" or not state.get("report"):
-            return jsonify({"error": "Complete the Defective Product analysis first."}), 409
+        if not state.get("report"):
+            return jsonify({"error": "Complete the selected module analysis first."}), 409
 
+        state.setdefault("timeline", [])
         state["timeline"].append(_timeline_event("PDF exported"))
         pdf_bytes = build_case_report_pdf(
             state["report"],

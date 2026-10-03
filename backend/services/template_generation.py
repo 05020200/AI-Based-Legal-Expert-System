@@ -277,77 +277,165 @@ class TemplateGenerationService:
         if document_type not in document_types:
             raise ValueError("Unsupported document type for this consumer issue.")
 
-        consumer_values = {
-            "Consumer name": consumer_details.get("consumer_name") or "[Consumer Name Not Provided]",
-            "Consumer address": consumer_details.get("consumer_address") or "[Consumer Address Not Provided]",
-            "Consumer phone": consumer_details.get("consumer_phone") or "[Consumer Phone Not Provided]",
-            "Consumer email": consumer_details.get("consumer_email") or "[Consumer Email Not Provided]",
-            "Document date": consumer_details.get("document_date") or "[Document Date Not Provided]",
+        consumer_name = (consumer_details or {}).get("consumer_name") or "Not provided"
+        consumer_address = (consumer_details or {}).get("consumer_address") or "Not provided"
+        consumer_phone = (consumer_details or {}).get("consumer_phone") or "Not provided"
+        consumer_email = (consumer_details or {}).get("consumer_email") or "Not provided"
+        document_date = (consumer_details or {}).get("document_date") or "Not provided"
+
+        summary = report.get("case_summary") or {}
+        selected_issue = summary.get("selected_issue") or definition["name"]
+        recipient = (
+            case_details.get("seller_name")
+            or case_details.get("service_provider")
+            or case_details.get("provider_name")
+            or case_details.get("advertiser_or_business")
+            or case_details.get("platform_name")
+            or answers.get("seller_name")
+            or answers.get("service_provider")
+            or "the relevant business or service provider"
+        )
+        item_name = (
+            case_details.get("product_name")
+            or case_details.get("service_type")
+            or case_details.get("advertised_product")
+            or case_details.get("platform_name")
+            or "the product or service"
+        )
+        purchase_date = self._format_date(case_details.get("purchase_date") or answers.get("purchase_date"), "Purchase Date")
+        amount_paid = self._format_amount(case_details.get("amount_paid") or answers.get("amount_paid"))
+        order_number = case_details.get("order_or_invoice_number") or answers.get("order_or_invoice_number") or "Not provided"
+        problem_text = (
+            case_details.get("problem_description")
+            or case_details.get("problem_situation")
+            or case_details.get("reason_for_request")
+            or answers.get("reason_for_request")
+            or answers.get("warranty_refusal_reason")
+            or answers.get("seller_response")
+            or "The issue was reported but no further detail has been supplied."
+        )
+        response_text = (
+            case_details.get("seller_response")
+            or case_details.get("provider_response")
+            or case_details.get("business_response")
+            or answers.get("seller_response")
+            or answers.get("provider_response")
+            or answers.get("business_response")
+            or answers.get("warranty_refusal_reason")
+            or "No response was provided."
+        )
+        desired_resolution = (
+            case_details.get("desired_resolution")
+            or answers.get("desired_resolution")
+            or "Not specified"
+        )
+
+        evidence_labels = {
+            "purchase_proof_available": "Purchase Invoice / Receipt",
+            "problem_evidence_available": "Product Photos / Videos",
+            "seller_communication_available": "Seller Communication",
+            "order_proof_available": "Order Confirmation / Order Details",
+            "payment_proof_available": "Payment Proof",
+            "delivery_proof_available": "Delivery Proof",
+            "communication_available": "Seller / Platform Communication",
+            "service_record_available": "Repair / Service Records",
+            "warranty_document_available": "Warranty Card / Warranty Document",
         }
-        lines = [
-            self._DOCUMENT_TITLES[document_type],
-            f"Case ID: {case_id}",
-            f"Issue: {definition['name']}",
-            "",
-            "Consumer Details:",
-            *[f"{label}: {value}" for label, value in consumer_values.items()],
-            "",
-            "Case Details:",
+        available_evidence = [
+            label for fact_key, label in evidence_labels.items()
+            if answers.get(fact_key) is True
         ]
-        detail_labels = {
-            "product_name": "Product",
-            "platform_name": "Platform",
-            "seller_name": "Seller / Business",
-            "seller_address": "Seller Address",
-            "purchase_date": "Purchase / Order Date",
-            "amount_paid": "Amount Paid",
-            "order_or_invoice_number": "Order / Invoice Number",
-            "problem_description": "Problem Description",
-            "seller_response": "Seller / Platform Response",
+        if not available_evidence:
+            available_evidence = [
+                item.get("name")
+                for item in (report.get("evidence_checklist") or [])
+                if item.get("available") is True
+            ]
+        if not available_evidence:
+            available_evidence = ["No supporting documents were reported as available."]
+
+        subject_map = {
+            "seller_complaint": f"Complaint regarding {selected_issue}",
+            "warranty_complaint": "Complaint regarding warranty service",
+            "service_provider_complaint": "Complaint regarding deficient service",
+            "business_complaint": "Complaint regarding misleading or unfair business practice",
+            "refund_request": "Request for refund",
+            "replacement_request": "Request for replacement",
+            "refund_compensation_request": "Request for refund or compensation",
+            "refund_correction_request": "Request for correction or refund",
+            "consumer_commission_complaint": "Complaint before the appropriate consumer forum",
         }
-        for key, label in detail_labels.items():
-            value = case_details.get(key)
-            if value not in (None, ""):
-                lines.append(f"{label}: {value}")
+        subject = subject_map.get(document_type, f"{selected_issue} complaint")
 
-        lines.extend(["", "Facts Reported:"])
-        for question in ConsumerModuleService.get_questions(module_id):
-            key = question["key"]
-            if key not in answers:
-                continue
-            value = answers[key]
-            if isinstance(value, bool):
-                value = "Yes" if value else "No"
-            lines.append(f"{question['prompt']} {value}")
-
-        evidence = [
-            item["name"] for item in report.get("evidence_checklist", [])
-            if item.get("available") is True
-        ]
-        lines.extend(["", "Evidence Reported Available:"])
-        lines.extend(f"- {item}" for item in evidence)
-        if not evidence:
-            lines.append("[No evidence reported as available]")
-
-        lines.extend(["", "Relevant Provisions in the Guidance:"])
-        provisions = report.get("legal_provisions") or []
-        for provision in provisions:
-            lines.append(
-                f"- {provision.get('act_name')} — {provision.get('section_number')}: {provision.get('title')}"
+        if module_id == "refund_replacement":
+            body = (
+                f"I purchased {item_name} from {recipient} on {purchase_date}. The amount paid was {amount_paid}. "
+                f"The order or invoice number is {order_number}.\n\n"
+                f"I reported that {problem_text}. I contacted {recipient} and was informed that {response_text}.\n\n"
+                f"I request that the matter be reviewed and that the requested resolution, namely {desired_resolution}, be considered."
             )
-        if not provisions:
-            lines.append("[No specific provision was identified in the guidance]")
+        elif module_id == "warranty":
+            body = (
+                f"I purchased {item_name} from {recipient} on {purchase_date}. The product was accompanied by the details "
+                f"and documentation available to me, including any warranty information and payment records.\n\n"
+                f"I reported a problem with the product: {problem_text}. I requested warranty service and was informed that {response_text}.\n\n"
+                f"I request that the matter be reviewed and that {desired_resolution} be considered as the appropriate remedy."
+            )
+        elif module_id == "ecommerce":
+            body = (
+                f"I placed an order for {item_name} through {case_details.get('platform_name') or answers.get('platform_name') or 'the online platform'} on {purchase_date}. "
+                f"The order number or reference was {order_number}. The amount paid was {amount_paid}.\n\n"
+                f"The issue reported was: {problem_text}. I communicated with {recipient} and the response received was: {response_text}.\n\n"
+                f"I request that the matter be reviewed and that {desired_resolution} be considered as the appropriate resolution."
+            )
+        elif module_id == "service_deficiency":
+            body = (
+                f"I engaged {recipient} for {item_name} on {purchase_date}. The amount paid was {amount_paid}. "
+                f"I reported the service problem as: {problem_text}.\n\n"
+                f"I communicated with {recipient} and the response received was: {response_text}.\n\n"
+                f"I request that the matter be reviewed and that {desired_resolution} be considered as the appropriate resolution."
+            )
+        else:
+            body = (
+                f"I became aware of the advertisement or business practice relating to {item_name} by {recipient} on {purchase_date or 'the relevant date'}. "
+                f"The claim or representation reported was: {problem_text}.\n\n"
+                f"I communicated with {recipient} and the response received was: {response_text}.\n\n"
+                f"I request that the matter be reviewed and that {desired_resolution} be considered as the appropriate resolution."
+            )
 
-        lines.extend([
-            "",
-            "Reported Assessment:",
-            report.get("possible_issue") or report.get("assessment") or "[Guidance not provided]",
-            "",
-            f"Requested resolution: {answers.get('desired_resolution') or '[Not Provided]'}",
-            "",
-            "This is a preliminary draft based only on the information supplied. Review all details, applicable terms, and current filing requirements before use. It does not guarantee any outcome.",
-        ])
-        return "\n".join(lines)
+        legal_reference = report.get("legal_provisions") or []
+        legal_text = ""
+        if legal_reference:
+            legal_text = (
+                "\n\nThe legal basis relevant to this complaint, as available in the case record, is "
+                + "; ".join(
+                    f"{item.get('act_name')} — {item.get('section_number')} ({item.get('title')})"
+                    for item in legal_reference[:2]
+                    if item.get('act_name') or item.get('section_number') or item.get('title')
+                )
+                + "."
+            )
+
+        evidence_block = "\n".join(f"- {item}" for item in available_evidence)
+        cases_block = (
+            f"The complaint concerns {selected_issue}."
+            if selected_issue
+            else "The complaint concerns the relevant consumer issue."
+        )
+        return (
+            f"{self._DOCUMENT_TITLES.get(document_type, document_type.upper().replace('_', ' '))}\n\n"
+            f"Date: {document_date}\n\n"
+            f"To: {recipient}\n\n"
+            f"Subject: {subject}\n\n"
+            f"Dear Sir/Madam,\n\n"
+            f"I, {consumer_name}, am filing this complaint in relation to {selected_issue}.\n\n"
+            f"{body}{legal_text}\n\n"
+            f"Supporting Documents\n{evidence_block}\n\n"
+            f"I request that this matter be reviewed promptly and that the appropriate remedy be considered. "
+            f"I am available to provide any additional documents or information required.\n\n"
+            f"Yours faithfully,\n\n{consumer_name}\n{consumer_address}\n{consumer_phone}\n{consumer_email}\n"
+            f"\n{cases_block}"
+        )
 
     def _generate_commission_complaint(
         self, case_details: Dict[str, Any], consumer_details: Dict[str, Any]

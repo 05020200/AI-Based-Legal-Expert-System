@@ -109,16 +109,22 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline, case_tit
         fontSize=8.5,
         textColor=colors.HexColor("#586b77"),
     )
+    selected_issue = (
+        report.get("case_summary", {}).get("selected_issue")
+        or report.get("title")
+        or case_title
+        or "Consumer Case Report"
+    )
     story = [
         Paragraph("LegalAssist", title_style),
-        _paragraph("Defective Product Case Report", heading_style),
+        _paragraph(f"{selected_issue} Case Report", heading_style),
     ]
 
     metadata = [
         ["Case ID", case_id or "Not provided"],
-        ["Case title", case_title or report.get("case_summary", {}).get("selected_issue", "Defective Product")],
+        ["Case title", case_title or selected_issue],
         ["Case date", _format_date(created_at)],
-        ["Selected issue", report.get("case_summary", {}).get("selected_issue", "Defective Product")],
+        ["Selected issue", selected_issue],
     ]
     metadata_table = Table(
         [[_paragraph(key, body_style), _paragraph(value, body_style)] for key, value in metadata],
@@ -137,20 +143,25 @@ def build_case_report_pdf(report, case_id, created_at, facts, timeline, case_tit
     ]))
     story.extend([metadata_table, Spacer(1, 3 * mm)])
 
-    summary = report.get("case_summary", {})
-    resolution = summary.get("seller_response_resolution", {})
+    summary = report.get("case_summary", {}) or {}
+    resolution = summary.get("seller_response_resolution", {}) or {}
+    if not resolution and isinstance(summary.get("seller_response"), dict):
+        resolution = summary.get("seller_response") or {}
+
     summary_fields = [
+        ("Issue", summary.get("selected_issue") or selected_issue),
         ("Product purchased from seller/business", _yes_no(summary.get("product_purchased"))),
         ("Product has a problem", _yes_no(summary.get("product_has_problem"))),
-        ("Product name", summary.get("product_name")),
-        ("Seller/business name", summary.get("seller_name")),
+        ("Product name", summary.get("product_name") or summary.get("product_or_service_purchased")),
+        ("Platform name", summary.get("platform_name")),
+        ("Seller/business name", summary.get("seller_name") or summary.get("service_provider") or summary.get("advertiser_or_business")),
         ("Purchase date", _format_date(summary.get("purchase_date"))),
         ("Amount paid", _format_amount(summary.get("amount_paid"))),
         ("Order/invoice number", summary.get("order_or_invoice_number")),
-        ("Problem/situation", summary.get("problem_situation")),
-        ("Seller contacted", _yes_no(summary.get("seller_contacted"))),
-        ("Seller resolved problem", _yes_no(resolution.get("problem_resolved"))),
-        ("Seller response/details", resolution.get("response_details")),
+        ("Problem/situation", summary.get("problem_situation") or summary.get("service_type") or summary.get("reason_for_request")),
+        ("Seller contacted", _yes_no(summary.get("seller_contacted") or summary.get("seller_or_service_contacted") or summary.get("provider_contacted"))),
+        ("Seller resolved problem", _yes_no(resolution.get("problem_resolved") or summary.get("issue_resolved"))),
+        ("Seller response/details", resolution.get("response_details") or summary.get("seller_response") or summary.get("provider_response")),
         ("Desired resolution", summary.get("desired_resolution")),
     ]
     story.append(Paragraph("Your Situation / Case Summary", heading_style))
