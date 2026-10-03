@@ -271,9 +271,10 @@ function renderCases(cases) {
         return;
     }
     cases.forEach(item => {
+        const recentCase = formatRecentCase(item);
         const historyItem = document.createElement('li');
         historyItem.className = 'case-history-item';
-        historyItem.innerHTML = `<div><strong>${escapeHtml(item.case_title)}</strong><span>${escapeHtml(item.case_id)}</span></div>`;
+        historyItem.innerHTML = `<div><strong>${escapeHtml(recentCase.subject)}</strong><span>${escapeHtml(recentCase.issue)} · ${escapeHtml(recentCase.domain)}</span></div>`;
         const historyActions = document.createElement('div');
         historyActions.className = 'case-actions';
         historyActions.append(createOpenCaseButton(item), createDeleteCaseButton(item));
@@ -282,13 +283,84 @@ function renderCases(cases) {
 
         const dashboardItem = document.createElement('li');
         dashboardItem.className = 'dashboard-case';
-        dashboardItem.innerHTML = `<div><strong>${escapeHtml(item.case_title)}</strong><span>${escapeHtml(item.case_id)}</span></div>`;
+        dashboardItem.innerHTML = `<div><strong>${escapeHtml(recentCase.subject)}</strong><span>${escapeHtml(recentCase.issue)} · ${escapeHtml(recentCase.domain)}</span></div>`;
         const actions = document.createElement('div');
         actions.className = 'case-actions';
         actions.append(createOpenCaseButton(item), createDeleteCaseButton(item));
         dashboardItem.append(actions);
         dashboardCases.appendChild(dashboardItem);
     });
+}
+
+function formatRecentCase(item) {
+    const title = String(item?.case_title || '').trim();
+    const rawIssue = String(item?.issue || item?.report?.case_summary?.selected_issue || '').trim();
+    const issue = normalizeRecentCaseIssue(rawIssue || (title.includes(' — ') ? title.split(' — ').pop() : ''));
+    const domain = normalizeRecentCaseDomain(issue);
+    const subjectFromTitle = title.includes(' — ') ? title.split(' — ')[0].trim() : title || 'Untitled case';
+    return {
+        subject: formatRecentCaseSubject(subjectFromTitle || 'Untitled case'),
+        issue: issue || 'Consumer Issue',
+        domain: domain || 'Consumer',
+    };
+}
+
+function normalizeRecentCaseIssue(value) {
+    const issueName = String(value || '').trim();
+    const issueMap = {
+        defective_product: 'Defective Product',
+        'defective product': 'Defective Product',
+        refund_replacement: 'Refund / Replacement Issue',
+        'refund / replacement issue': 'Refund / Replacement Issue',
+        warranty: 'Warranty Issue',
+        'warranty issue': 'Warranty Issue',
+        ecommerce: 'E-Commerce Issue',
+        'e-commerce consumer issue': 'E-Commerce Issue',
+        'e-commerce issue': 'E-Commerce Issue',
+        service_deficiency: 'Deficiency in Service',
+        'deficiency in service': 'Deficiency in Service',
+        unfair_trade_practice: 'Misleading Advertisement / Unfair Trade Practice',
+        'misleading advertisement / unfair trade practice': 'Misleading Advertisement / Unfair Trade Practice',
+    };
+    return issueMap[issueName.toLowerCase()] || issueName || 'Consumer Issue';
+}
+
+function normalizeRecentCaseDomain(value) {
+    const issueKey = String(value || '').trim().toLowerCase();
+    const domainMap = {
+        'defective product': 'Consumer',
+        'refund / replacement issue': 'Consumer',
+        'warranty issue': 'Consumer',
+        'e-commerce issue': 'Consumer',
+        'deficiency in service': 'Consumer',
+        'misleading advertisement / unfair trade practice': 'Consumer',
+        consumer: 'Consumer',
+        rental: 'Rental',
+        cyber: 'Cyber',
+        contract: 'Contract',
+    };
+    return domainMap[issueKey] || 'Consumer';
+}
+
+function formatRecentCaseSubject(value) {
+    const subject = String(value || 'Untitled case').trim();
+    if (!subject) return 'Untitled case';
+    const normalized = subject.replace(/\s+/g, ' ');
+    const lower = normalized.toLowerCase();
+
+    if (lower === 'pc') return 'PC';
+    if (lower === 'mobile phone') return 'Mobile Phone';
+    return normalized
+        .split(' ')
+        .map(word => {
+            const lowerWord = word.toLowerCase();
+            if (lowerWord === 'pc') return 'PC';
+            if (lowerWord === 'and' || lowerWord === 'or' || lowerWord === 'of' || lowerWord === 'the') {
+                return lowerWord;
+            }
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ');
 }
 
 
@@ -395,20 +467,88 @@ async function openCase(token) {
 async function loadModules() {
     const response = await axios.get(`${API_BASE_URL}/modules`);
     moduleOptions = response.data.modules;
+    renderDomainSelection();
+}
+
+function renderDomainSelection() {
+    const domains = [
+        {
+            id: 'consumer',
+            name: 'Consumer',
+            description: 'Legal issues involving products, services, purchases, refunds, warranties, and consumer rights.',
+            clickable: true,
+        },
+        {
+            id: 'rental',
+            name: 'Rental',
+            description: 'Legal issues involving rental agreements, tenants, landlords, and rental disputes.',
+            clickable: false,
+        },
+        {
+            id: 'cyber',
+            name: 'Cyber',
+            description: 'Legal issues involving online fraud, cybercrime, digital transactions, and other cyber-related matters.',
+            clickable: false,
+        },
+        {
+            id: 'contract',
+            name: 'Contract',
+            description: 'Legal issues involving agreements, contractual obligations, breaches, and contract disputes.',
+            clickable: false,
+        },
+    ];
+
+    const title = document.getElementById('module-selection-title');
+    const description = document.getElementById('module-selection-description');
+    if (title) title.textContent = 'Select a Legal Domain';
+    if (description) description.textContent = 'Choose a legal domain to continue.';
+
+    moduleCards.replaceChildren();
+    domains.forEach(domain => {
+        const card = document.createElement('article');
+        card.className = `module-card ${domain.clickable ? '' : 'is-disabled'}`;
+
+        const heading = document.createElement('h2');
+        heading.textContent = domain.name;
+
+        const text = document.createElement('p');
+        text.textContent = domain.description;
+
+        if (domain.clickable) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = 'Select';
+            button.addEventListener('click', () => {
+                renderConsumerModuleSelection();
+            });
+            card.append(heading, text, button);
+        } else {
+            card.append(heading, text);
+        }
+
+        moduleCards.appendChild(card);
+    });
+}
+
+function renderConsumerModuleSelection() {
+    const title = document.getElementById('module-selection-title');
+    const description = document.getElementById('module-selection-description');
+    if (title) title.textContent = 'Select a Consumer Issue';
+    if (description) description.textContent = 'Choose the issue that best matches your situation.';
+
     moduleCards.replaceChildren();
     moduleOptions.forEach(module => {
         const card = document.createElement('article');
         card.className = 'module-card';
-        const title = document.createElement('h2');
-        title.textContent = module.name;
-        const description = document.createElement('p');
-        description.textContent = module.description;
+        const titleNode = document.createElement('h2');
+        titleNode.textContent = module.name;
+        const descriptionNode = document.createElement('p');
+        descriptionNode.textContent = module.description;
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = module.available ? 'Select' : 'Coming later';
-        button.disabled = !module.available;
-        if (module.available) button.addEventListener('click', () => selectModule(module.id));
-        card.append(title, description, button);
+        button.textContent = 'Select';
+        button.addEventListener('click', () => selectModule(module.id));
+        card.append(titleNode, descriptionNode, button);
         moduleCards.appendChild(card);
     });
 }
@@ -778,7 +918,7 @@ async function completeEvidenceStep() {
 
 function showReport(report) {
     showScreen('report');
-    appendMessage('assistant', `<p class="case-number">${escapeHtml(currentCase?.case_id || '')}</p>${renderReport(report)}`);
+    appendMessage('assistant', renderReport(report));
     if (exportBtn) exportBtn.classList.remove('hidden');
 }
 
@@ -960,7 +1100,6 @@ function renderSummary(summary) {
             ['Warranty service requested', summary.warranty_service_requested === undefined ? null : yesNo(summary.warranty_service_requested)],
             ['Seller / service centre contacted', summary.seller_or_service_contacted === undefined ? null : yesNo(summary.seller_or_service_contacted)],
             ['Warranty service provided', summary.warranty_service_provided === undefined ? null : yesNo(summary.warranty_service_provided)],
-            ['Service refused / incomplete', summary.warranty_service_refused === undefined ? null : yesNo(summary.warranty_service_refused)],
             ['Refusal reason', summary.warranty_refusal_reason],
             ['Desired resolution', summary.desired_resolution],
             ['Product name', summary.product_name],
@@ -1072,15 +1211,14 @@ function renderSummary(summary) {
     }
     const resolution = summary.seller_response_resolution;
     const items = [
-        ['Case ID', currentCase?.case_id],
         ['Case title', currentCase?.case_title],
         ['Selected issue', summary.selected_issue],
         ['Purchased from a seller or business', yesNo(summary.product_purchased)],
         ['Product has a problem', yesNo(summary.product_has_problem)],
         ['Product name', summary.product_name],
         ['Seller name', summary.seller_name],
-        ['Purchase date', formatPurchaseDate(summary.purchase_date)],
-        ['Amount paid', formatAmount(summary.amount_paid)],
+        ['Purchase date', summary.purchase_date ? formatPurchaseDate(summary.purchase_date) : null],
+        ['Amount paid', summary.amount_paid ? formatAmount(summary.amount_paid) : null],
         ['Order / invoice number', summary.order_or_invoice_number],
         ['Problem / situation', summary.problem_situation],
         ['Seller contacted', yesNo(summary.seller_contacted)],
@@ -1089,13 +1227,13 @@ function renderSummary(summary) {
         ['Desired resolution', summary.desired_resolution],
     ];
     Object.entries(summary.evidence_availability).forEach(([name, available]) => {
-        items.push([`Evidence: ${name}`, yesNo(available)]);
+        items.push([`Evidence: ${name}`, available === undefined || available === null ? null : yesNo(available)]);
     });
     Object.entries(summary.issue_details || {}).forEach(([label, value]) => {
         items.push([label, typeof value === 'boolean' ? yesNo(value) : value]);
     });
-    return `<dl class="summary-list">${items.map(([label, value]) => `
-        <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value === null || value === undefined || value === '' ? 'Not provided' : value)}</dd></div>`).join('')}
+    return `<dl class="summary-list">${items.filter(([, value]) => value !== null && value !== undefined && value !== '' && !(typeof value === 'string' && value.trim() === 'Not provided')).map(([label, value]) => `
+        <div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}
     </dl>`;
 }
 

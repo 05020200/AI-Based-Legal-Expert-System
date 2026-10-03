@@ -161,6 +161,8 @@ body { font-family: var(--font-family); background-color: var(--background-color
 .module-card p { flex: 1; color: var(--text-muted); font-size: 0.85rem; line-height: 1.4; }
 .module-card button { min-height: 34px; padding: 0.35rem 0.7rem; border: 1px solid #287d78; border-radius: 3px; background: white; color: #225f5b; font: inherit; cursor: pointer; }
 .module-card button:disabled { border-color: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+.module-card.is-disabled { opacity: 0.72; pointer-events: none; }
+.module-card.is-disabled .module-card-button { display: none; }
 .dashboard-cases { display: grid; gap: 0.5rem; list-style: none; }
 .dashboard-case { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.8rem 0; border-bottom: 1px solid var(--border-color); }
 .dashboard-case > div:first-child { display: grid; gap: 0.25rem; min-width: 0; }
